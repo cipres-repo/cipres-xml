@@ -5,6 +5,18 @@ $(document).ready(function() {
 		type: 'GET',
     dataType: 'xml'
 	}).then(function(data) {
-		console.log(data);
+		//console.log(data);
+		var count = 0;
+		var parameters = $(data).find("parameter").each(function(index, value) {
+			var string = "<tr>"
+			string += "<td>" + $(this).find("name").text() + "</td>";
+			string += "<td>" + $(this).find("prompt").text() + "</td>";
+			string += "<td>" + $(this).attr("type") + "</td>";
+			string += "</tr>";
+			$('table').append(string);
+			count++;
+		});
+		//console.log(parameters);
+		console.log(count);
 	});
 });
