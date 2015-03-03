@@ -1,20 +1,28 @@
 $(document).ready(function() {
-	
+	//configuration
 	var url = 'https://bumper.sdsc.edu/cipresrest/v1/tool/BEAST_TG/doc/pise';
 	
+	//subject -> observer(s)
+	var observerMap = {};
+	//array of controls
+	var controlsArray = [];
+
+	//retrieve pisexml file
 	$.ajax({
 		url: url,
 		type: 'GET',
     dataType: 'xml'
 	})
-
+	//render file
 	.then(function(data) {
-		//subject -> observer(s)
-		var observerMap = {};
 		//iterate through parameters
 		$(data).find("parameter[issimple='1']:not([ishidden='1'])").each(function(index, value) {
+			//default parameters for insertElement
 			var $node = $(value);
 			var label = $node.find('prompt').text();
+			var disabled = false;
+			var data = null;
+
 			var $precond = $node.find('precond');
 			//node has precondition, add to observer map
 			if ($precond.length) {
@@ -31,13 +39,27 @@ $(document).ready(function() {
 						observerMap[value] = [observer];
 					}
 				});
-
-				insertElement($node, label, true, {code: code, subjects: subjects.join()});
+				//adjust parameters
+				disabled = true;
+				data = {
+					code: code,
+					subjects: subjects.join()
+				};
 			}
-			else {
-				insertElement($node, label, false, null);
+			//node has controls
+			var $controls = $node.find('ctrl');
+			if ($controls.length) {
+				$.each($controls, function(index, value) {
+					var $value = $(value);
+					//push control and its relevant properties to controlsArray
+					controlsArray.push({
+						message: $value.children('message').text(),
+						code: $value.children('code').text(),
+					});
+				});
 			}
-
+			//append element to html DOM
+			insertElement($node, label, disabled, data);
 		});
 		//bind subjects in observermap to observers
 		for (var prop in observerMap) {
@@ -45,8 +67,30 @@ $(document).ready(function() {
 			console.log(selector);
 			$(selector).data('obs', observerMap[prop].toString()).change(notifyObservers);
 		}
-
+		//append submit button
+		$('form').append('<input type="submit" value="Test Submit">');
 	});
+
+	//Form submition
+	$('form').submit(function(e) {
+		e.preventDefault();
+		var error = false;
+		//evaluate the controls
+		$.each(controlsArray, function(index, value) {
+			if (resolveControl(value)) {
+				alert(value.message);
+				error = true;
+				return false;
+			}
+		});
+		//submit if there were no errors
+		if (!error) {
+			alert('no errors recorded');
+		}
+	});
+
+	/// HELPER FUNCTIONS ///
+
 	//notifies observers of value change
 	function notifyObservers() {
 		var observers = $(this).data('obs').split(',');
@@ -58,7 +102,7 @@ $(document).ready(function() {
 		$value = $('#' + value);
 		var subjects = $value.data('sub').split(',');
 		var code = $value.data('code');
-		$value.prop('disabled', resolve(code, subjects));
+		$value.prop('disabled', !resolve(code, subjects));
 	}
 
 	function resolve(code, subjects) {
@@ -74,8 +118,15 @@ $(document).ready(function() {
 				subjects[index] = $subject.val();
 			}
 		});
+		console.log(code);
+		console.log(subjects);
 		//evaluate and reeturn
-		return(!eval(code));
+		return(eval(code));
+	}
+
+	function resolveControl(control) {
+		var variables = control.code.match(/\$\w+/g);
+		return(resolve(control.code, variables));
 	}
 
 	//nserts xml element into dom
