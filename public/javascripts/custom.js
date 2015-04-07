@@ -1,6 +1,7 @@
 $(document).ready(function() {
 	//configuration
-	var url = 'https://bumper.sdsc.edu/cipresrest/v1/tool/BEAST_TG/doc/pise';
+	//var url = 'https://bumper.sdsc.edu/cipresrest/v1/tool/BEAST_TG/doc/pise';
+	var url = 'https://bumper.sdsc.edu/cipresrest/v1/tool/CLEARCUT/doc/pise';
 	
 	//subject -> observer(s)
 	var observerMap = {};
@@ -65,7 +66,11 @@ $(document).ready(function() {
 		for (var prop in observerMap) {
 			var selector = '#' + prop.substr(1);
 			console.log(selector);
-			$(selector).data('obs', observerMap[prop].toString()).change(notifyObservers);
+			$(selector).data('obs', observerMap[prop].toString())
+				//notify observers on status change
+				.change(notifyObservers)
+				//initial notiiication to observers
+				.trigger('change');
 		}
 		//append submit button
 		$('form').append('<input type="submit" value="Test Submit">');
@@ -132,6 +137,7 @@ $(document).ready(function() {
 	//nserts xml element into dom
 	function insertElement($node, label, disabled, data) {
 		var type = $node.attr('type');
+		var vlist = false;
 		//assign appropriate input type
 		switch (type) {
 			case 'Integer':
@@ -143,6 +149,9 @@ $(document).ready(function() {
 			case 'Switch':
 				type = 'type="checkbox"';
 				break;
+			case 'Excl':
+				vlist = true;
+				break;
 			default: 
 				type = 'type="text"';
 		}
@@ -150,8 +159,23 @@ $(document).ready(function() {
 		var disabled = (disabled) ? 'disabled' : '';
 		var data = (data) ? 'data-sub="' + data.subjects + '" data-code="' + data.code + '"' : '';
 
-		var eString = "<input " + id + type + data + disabled  + "><br>";
-		
+		var eString = null;
+		if (vlist) {
+			//select element
+			eString = "<select " + id + data + disabled + ">";
+			//options
+
+			$.each($node.find('vlist').children('value'), function(index, value) {
+				var $val = $(value);
+				eString += "<option value='" + $val.text() + "'>" + $val.next().text() + "</option>";
+			});
+			//end select element
+			eString += "</select><br>";
+		}
+		else {
+			eString = "<input " + id + type + data + disabled  + "><br>";
+		}
+
 		label = "<label>" + label + "</label>";
 		$('.output').append(label + eString);
 
