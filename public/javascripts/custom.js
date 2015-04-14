@@ -1,7 +1,7 @@
 $(document).ready(function() {
 	//configuration
 	//var url = 'https://bumper.sdsc.edu/cipresrest/v1/tool/BEAST_TG/doc/pise';
-	var url = 'https://bumper.sdsc.edu/cipresrest/v1/tool/CLEARCUT/doc/pise';
+	var url = 'https://bumper.sdsc.edu/cipresrest/v1/tool';
 	
 	//subject -> observer(s)
 	var observerMap = {};
@@ -14,6 +14,29 @@ $(document).ready(function() {
 		type: 'GET',
     dataType: 'xml'
 	})
+
+	.then(function(data){
+		
+		var list = "<select id='toolselector'>";
+
+		$(data).find("tool").each(function(index, value) {
+			//search for each tool
+			var $node = $(value);
+			var toolName = $node.find('toolId').text();
+			var pise = $node.find('piseUri').find('url').text();
+		
+			
+			list += "<option value='" + pise + "'>" + toolName + "</option>";
+		});
+		
+		list += "</select><br>";
+		$('.tools').append(list);
+		$("#toolselector").change(function() {
+			console.log($(this).val());
+		});
+
+	});
+	/*
 	//render file
 	.then(function(data) {
 		//iterate through parameters
@@ -93,7 +116,7 @@ $(document).ready(function() {
 			alert('no errors recorded');
 		}
 	});
-
+*/
 	/// HELPER FUNCTIONS ///
 
 	//notifies observers of value change
