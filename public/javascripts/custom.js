@@ -1,7 +1,7 @@
 $(document).ready(function() {
 	//configuration
-	//var url = 'https://bumper.sdsc.edu/cipresrest/v1/tool/BEAST_TG/doc/pise';
-	var url = 'https://bumper.sdsc.edu/cipresrest/v1/tool/CLEARCUT/doc/pise';
+	var url = 'https://bumper.sdsc.edu/cipresrest/v1/tool/BEAST_TG/doc/pise';
+	//var url = 'https://bumper.sdsc.edu/cipresrest/v1/tool/CLEARCUT/doc/pise';
 	
 	//subject -> observer(s)
 	var observerMap = {};
@@ -55,7 +55,7 @@ $(document).ready(function() {
 					//push control and its relevant properties to controlsArray
 					controlsArray.push({
 						message: $value.children('message').text(),
-						code: $value.children('code').text(),
+						code: sanitizeCode($value.children('code').text()),
 					});
 				});
 			}
@@ -95,7 +95,9 @@ $(document).ready(function() {
 	});
 
 	/// HELPER FUNCTIONS ///
-
+	function sanitizeCode(code) {
+		return code.replace(/!defined */, '!');
+	}
 	//notifies observers of value change
 	function notifyObservers() {
 		var observers = $(this).data('obs').split(',');
@@ -112,6 +114,7 @@ $(document).ready(function() {
 
 	function resolve(code, subjects) {
 		$.each(subjects, function(index, value) {
+			console.log('evaluating code: ' + code);
 			//replace variables in code with reference to subjects array
 			code = code.replace(value, 'subjects[' + index + ']');
 			//replace values in subjects array
