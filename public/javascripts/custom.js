@@ -4,9 +4,9 @@ $(document).ready(function() {
 	var url = 'https://bumper.sdsc.edu/cipresrest/v1/tool';
 	
 	//subject -> observer(s)
-	var observerMap = {};
+	//var observerMap = {};
 	//array of controls
-	var controlsArray = [];
+	//var controlsArray = [];
 
 	//retrieve pisexml file
 	$.ajax({
@@ -32,11 +32,27 @@ $(document).ready(function() {
 		list += "</select><br>";
 		$('.tools').append(list);
 		$("#toolselector").change(function() {
-			console.log($(this).val());
+			render_tool($(this).val());
 		});
 
 	});
-	/*
+	var observerMap = null;
+	var controlsArray = null;
+
+	function render_tool(url) {
+	$('.output').empty();
+	//subject -> observer(s)
+	observerMap = {};
+	//array of controls
+	controlsArray = [];
+
+	//retrieve pisexml file
+	$.ajax({
+		url: url,
+		type: 'GET',
+    dataType: 'xml'
+	})
+
 	//render file
 	.then(function(data) {
 		//iterate through parameters
@@ -116,7 +132,7 @@ $(document).ready(function() {
 			alert('no errors recorded');
 		}
 	});
-*/
+	}
 	/// HELPER FUNCTIONS ///
 
 	//notifies observers of value change
