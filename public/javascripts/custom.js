@@ -1,12 +1,12 @@
 $(document).ready(function() {
 	//configuration
-	var url = 'https://bumper.sdsc.edu/cipresrest/v1/tool/BEAST_TG/doc/pise';
-	//var url = 'https://bumper.sdsc.edu/cipresrest/v1/tool/CLEARCUT/doc/pise';
+	//var url = 'https://bumper.sdsc.edu/cipresrest/v1/tool/BEAST_TG/doc/pise';
+	var url = 'https://bumper.sdsc.edu/cipresrest/v1/tool';
 	
 	//subject -> observer(s)
-	var observerMap = {};
+	//var observerMap = {};
 	//array of controls
-	var controlsArray = [];
+	//var controlsArray = [];
 
 	//retrieve pisexml file
 	$.ajax({
@@ -14,6 +14,45 @@ $(document).ready(function() {
 		type: 'GET',
     dataType: 'xml'
 	})
+
+	.then(function(data){
+		
+		var list = "<select id='toolselector'>";
+
+		$(data).find("tool").each(function(index, value) {
+			//search for each tool
+			var $node = $(value);
+			var toolName = $node.find('toolId').text();
+			var pise = $node.find('piseUri').find('url').text();
+		
+			
+			list += "<option value='" + pise + "'>" + toolName + "</option>";
+		});
+		
+		list += "</select><br>";
+		$('.tools').append(list);
+		$("#toolselector").change(function() {
+			render_tool($(this).val());
+		});
+
+	});
+	var observerMap = null;
+	var controlsArray = null;
+
+	function render_tool(url) {
+	$('.output').empty();
+	//subject -> observer(s)
+	observerMap = {};
+	//array of controls
+	controlsArray = [];
+
+	//retrieve pisexml file
+	$.ajax({
+		url: url,
+		type: 'GET',
+    dataType: 'xml'
+	})
+
 	//render file
 	.then(function(data) {
 		//iterate through parameters
@@ -77,7 +116,7 @@ $(document).ready(function() {
 	});
 
 	//Form submition
-	$('form').submit(function(e) {
+	$('form').unbind().submit(function(e) {
 		e.preventDefault();
 		var error = false;
 		//evaluate the controls
@@ -93,7 +132,7 @@ $(document).ready(function() {
 			alert('no errors recorded');
 		}
 	});
-
+	}
 	/// HELPER FUNCTIONS ///
 	function sanitizeCode(code) {
 		return code.replace(/!defined */, '!');
