@@ -19,7 +19,7 @@ provided under the Further Reading / Useful Links section.
 
 ## Installation
 
-* `git clone https://github.com/robreys/cipres-ember.git` this repository
+* `git clone https://github.com/robreys/cipres-xml` this repository
 * change into the new directory
 * `npm install`
 * `bower install`
