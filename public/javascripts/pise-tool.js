@@ -193,7 +193,7 @@ var pise_tool = (function() {
 		}
 
 		label = "<label>" + label + "</label>";
-		$(container).append(label + eString);
+		$(container).append("<div class='form-group'>" + label + eString + "</div>");
 
 	}
 

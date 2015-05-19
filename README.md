@@ -27,7 +27,7 @@ provided under the Further Reading / Useful Links section.
 
 ## Running / Development
 
-* `npm run`
+* `npm start`
 * Visit your app at http://localhost:3000.
 
 ## Further Reading / Useful Links
