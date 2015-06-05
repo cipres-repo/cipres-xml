@@ -56,8 +56,8 @@ var pise_tool = (function() {
 						//insert paragraph elements
 						$value.children('paragraph').children('parameters').children(paramFilter).each(function(index, value) {
 							insertToForm(value, observerMap, controlsArray, {
-								simContainer: "div#" + id + " div.simple",
-								advContainer: "div#" + id + " div.advanced"
+								simContainer: "div#" + id + " > div.simple",
+								advContainer: "div#" + id + " > div.advanced"
 							}, false);
 						});
 					}
@@ -101,6 +101,7 @@ var pise_tool = (function() {
 	//end of toolObj.render_tool
 
 	/// HELPER FUNCTIONS ///
+
 	//inserts individual parameters to form
 	/*
 		value: xml parameter
@@ -196,6 +197,7 @@ var pise_tool = (function() {
 		$value = $('#' + value);
 		var subjects = $value.data('sub').split(',');
 		var code = $value.data('code');
+		//modify child elements if paragraph
 		if ($value.hasClass('paragraph')) {
 			$value.children().prop('disabled', !resolve(code, subjects));
 		}
@@ -223,6 +225,7 @@ var pise_tool = (function() {
 	}
 	//end of function: resolve
 
+	//resolves a control
 	function resolveControl(control) {
 		var variables = control.code.match(/\$\w+/g);
 		return(resolve(control.code, variables));
@@ -293,7 +296,6 @@ var pise_tool = (function() {
 			//select element
 			eString = "<select " + name + id + data + disabled + ">";
 			//options
-
 			$.each($node.find('vlist').children('value'), function(index, value) {
 				var $val = $(value);
 				eString += "<option value='" + $val.text() + "'>" + $val.next().text() + "</option>";
