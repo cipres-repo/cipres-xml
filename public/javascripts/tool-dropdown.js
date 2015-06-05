@@ -31,12 +31,9 @@ $(document).ready(function() {
 			//add source file option to form
 			$(".container form").prepend("<label>Input source:</label>" + 
 				"<select name=source><option>Kepler director</option><option>web upload</option></select><br>");
+			//add headings to simple and advanced containers
 			$("div.simple").prepend("<h2>Simple Params</h2>");
-			$("div.advanced").before("<button class='adv-toggle'>Toggle Advanced</button>").prepend("<h2>Advanced Params</h2>");
-			$("button.adv-toggle").click(function(e) {
-				e.preventDefault();
-				$("div.advanced").toggle();
-			})
+			$("div.advanced").prepend("<h2>Advanced Params</h2>");
 		});
 	});
 });

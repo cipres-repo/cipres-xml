@@ -47,17 +47,21 @@ var pise_tool = (function() {
 				.children()
 				.children("parameters")
 				.children(paramFilter).each(function(index, value) {
-					if($(value).attr('type') == 'Paragraph') {
-						var id = $(value).children('paragraph').children('name').text();
+					var $value = $(value);
+					//paragraph parameters
+					if($value.attr('type') == 'Paragraph') {
+						var id = $value.children('paragraph').children('name').text();
+						//insert paragraph
 						insertToForm(value, observerMap, controlsArray, containers, true);
-						//var children = $(value).children('paragraph').children('parameters').children("parameter:not([ishidden='1']):not([type='Results']):not([type='OutFile'])");
-						$(value).children('paragraph').children('parameters').children(paramFilter).each(function(index, value) {
+						//insert paragraph elements
+						$value.children('paragraph').children('parameters').children(paramFilter).each(function(index, value) {
 							insertToForm(value, observerMap, controlsArray, {
 								simContainer: "div#" + id + " div.simple",
 								advContainer: "div#" + id + " div.advanced"
 							}, false);
 						});
 					}
+					//other parameters
 					else {
 						insertToForm(value, observerMap, controlsArray, containers, false);
 					}
@@ -74,6 +78,7 @@ var pise_tool = (function() {
 			//append submit button
 			$(container).append('<input type="submit" value="submit">');
 		});
+		//finished generating input elements
 
 		//Form submission
 		$(container).unbind().submit(function(e) {
@@ -93,15 +98,26 @@ var pise_tool = (function() {
 			}
 		});
 	};
+	//end of toolObj.render_tool
 
 	/// HELPER FUNCTIONS ///
+	//inserts individual parameters to form
+	/*
+		value: xml parameter
+		paragraph: element is a paragraph parameter (boolean)
+	*/
 	function insertToForm(value, observerMap, controlsArray, containers, paragraph) {
 		//default parameters for insertElement
 		var $node = $(value);
+		var label;
 		if (paragraph) {
 			$node = $node.children('paragraph');
+			$node.attr('type', 'Paragraph');
+			label = $node.children('prompt').text();
 		}
-		var label = $node.children('attributes').children('prompt').text();
+		else {
+			label = $node.children('attributes').children('prompt').text();
+		}
 		var disabled = false;
 		var data = null;
 
@@ -150,20 +166,31 @@ var pise_tool = (function() {
 			container: ($node.attr('issimple') == 1) ? containers.simContainer : containers.advContainer
 		});		
 	}
+	//end of function: insertToForm
+
 	//use this function to replace invalid perl code
 	function sanitizeCode(code) {
 		return code
 			.replace(/!defined */g, '!')
 			.replace(/\bne\b/g, '!=')
 			.replace(/\beq\b/g, '==')
-			.replace(/"/g, "'");
+			.replace(/"/g, "'")
+			//replace regex testing operator
+			.replace(/ *=~ */g, '.search')
+			.replace(/\//g, 'PLACEHOLDER')
+			.replace(/.searchPLACEHOLDER/g, '.search(/')
+			.replace(/PLACEHOLDER/g, '/) > -1');
+			;
 	}
+	//end of function: sanitizeCode
+
 	//notifies all observers of value change
 	function notifyObservers() {
 		var observers = $(this).data('obs').split(',');
 		$.each(observers, notify);
-		console.log('observers notified');
 	}
+	//end of function: notifyObservers
+
 	//notifies single observer
 	function notify(index, value) {
 		$value = $('#' + value);
@@ -175,6 +202,8 @@ var pise_tool = (function() {
 		else
 			$value.prop('disabled', !resolve(code, subjects));
 	}
+	//end of function: notify
+
 	//resolve observer-subject dependency
 	function resolve(code, subjects) {
 		$.each(subjects, function(index, value) {
@@ -189,14 +218,16 @@ var pise_tool = (function() {
 				subjects[index] = $subject.val();
 			}
 		});
-		//evaluate and reeturn
+		//evaluate and return
 		return(eval(code));
 	}
+	//end of function: resolve
 
 	function resolveControl(control) {
 		var variables = control.code.match(/\$\w+/g);
 		return(resolve(control.code, variables));
 	}
+	//end of function: resolveControl
 
 	//appends element to form
 	/*
@@ -208,9 +239,11 @@ var pise_tool = (function() {
 	*/
 	function insertElement($node, options) {
 		var type = $node.attr('type');
+		//parameter is a dropdown
 		var vlist = false;
+		//parameter is a paragraph
 		var para = false;
-		//assign appropriate input type
+		//assign appropriate input type based on parameter type
 		switch (type) {
 			case 'Integer':
 				type = 'type="text" ';
@@ -240,20 +273,22 @@ var pise_tool = (function() {
 				para = true;
 				break;
 			default: 
-				para = true;
+				type = 'type="text" ';
 		}
-
+		//determine element values
 		var name= 'name="' + $node.children('name').text() + '" '
 		var id = 'id="' + $node.children('name').text() + '" ';
 		var disabled = (options.disabled) ? 'disabled' : '';
 		var data = (options.data) ? 'data-sub="' + options.data.subjects + '" data-code="' + options.data.code + '" ' : '';
 
 		var eString = null;
+		//generate paragraph
 		if (para) {
 			eString = "<div " + name + id + data + disabled + "class='paragraph'>";
 			eString += "<div class='simple'></div><div class='advanced'></div>";
 			eString += "</div>";
 		}
+		//generate dropdown
 		else if (vlist) {
 			//select element
 			eString = "<select " + name + id + data + disabled + ">";
@@ -266,12 +301,23 @@ var pise_tool = (function() {
 			//end select element
 			eString += "</select><br>";
 		}
+		//generate input
 		else {
 			eString = "<input " + name + id + type + data + disabled  + "><br>";
 		}
-
-		var label = "<label>" + options.label + "</label>";
-		$(options.container).append("<div class='form-group'>" + label + eString + "</div>");
+		var text;
+		//create label or heading
+		if (para) {
+			text = "<h4>" + options.label + "</h4>";
+		}
+		else {
+			text = "<label>" + options.label + "</label>";
+		}
+		//and append elements to specified container
+		$(options.container).append("<div class='form-group'>" + text + eString + "</div>");
 	}
+	//end of function: insertElement
+
 	return toolObj;
+
 })();
