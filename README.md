@@ -1,4 +1,4 @@
-# cipres pise xml tool
+# Cipres pise xml tool
 
 This sample web application demonstrates a way to consume the CIPRES REST API tools service. 
 The application was developed using Node.js as well as jQuery.
