@@ -1,3 +1,10 @@
+/*
+	TODO: I don't think vdefs are being used.
+	Basic data types (int, float) aren't being validated.
+		I think this needs to be done before preconds are eval'd so we don't try to
+		compare strings and ints.
+	
+*/
 var pise_tool = (function() {
 	var toolObj = {};
 	//observer map and controls array
@@ -84,9 +91,46 @@ var pise_tool = (function() {
 		$(container).unbind().submit(function(e) {
 			e.preventDefault();
 			var error = false;
+
+			/* 
+				TODO: also validate required fields present
+				should find and report all errors at once.
+
+				Validate controls on empty string is not working the same as on portal.
+			*/
+
+			$(container).find('input').each(function()
+			{
+				var type = $(this).data('type');
+				var id = $(this).attr('id');
+				var value = $(this).val();
+				//if (type && (type == 'Integer'))
+				if (type && (type == 'Integer'))
+				{
+					if ( ! /^(0|[1-9]\d*)$/.test(str) )
+					{
+						console.log("field with id=" + id + " is not an integer");
+						alert(id + " must be a positive integer.");
+						return false;
+					}
+						
+				} else if (type && (type == 'Float'))
+				{
+					if ( ! /^\s*(\+|-)?((\d+(\.\d+)?)|(\.\d+))\s*$/.test(value) )
+					{
+						console.log("field with id=" + id + " is not float");
+						alert(id + " must be a decimal number.");
+						return false;
+					}
+				} 
+				
+			});
+
+
 			//evaluate the controls
 			$.each(controlsArray, function(index, value) {
-				if (resolveControl(value)) {
+				if (resolveControl(value)) 
+				{
 					alert(value.message);
 					error = true;
 					return false;
@@ -173,6 +217,7 @@ var pise_tool = (function() {
 	function sanitizeCode(code) {
 		return code
 			.replace(/!defined */g, '!')
+			.replace(/defined */g, ' ')
 			.replace(/\bne\b/g, '!=')
 			.replace(/\beq\b/g, '==')
 			.replace(/"/g, "'")
@@ -206,31 +251,58 @@ var pise_tool = (function() {
 	}
 	//end of function: notify
 
-	//resolve observer-subject dependency
-	function resolve(code, subjects) {
-		$.each(subjects, function(index, value) {
-			//replace variables in code with reference to subjects array
-			code = code.replace(value, 'subjects[' + index + ']');
-			//replace values in subjects array
-			$subject = $('#' + value.substr(1));
-			if ($subject.attr('type') == 'checkbox') {
-				subjects[index] = $subject.prop('checked');
+	/*
+		evaluate perl code snippets that have been  converted to javascript
+		variables is an array of the parameter names that are used as variables in the code snippet.
+		Used for pise precond and ctrl elements.
+	*/
+	function resolve(code, variables) {
+		console.log("Initial code: " + code);
+		console.log("Initial variables: " + variables);
+
+		/*
+			replace variables in code with reference to variables array
+			and then replace elements of variables array with their values
+			So code starts out looking like: ($p1 > $p2) and we change this to: ($variables[0] > $variables[1])
+			variables[] on entry to this fn looks like: ["$p1", "$p2"] and we change it to something like: [3, 5]
+		*/
+		$.each(variables, function(index, varname) {
+			code = code.replace(varname, 'variables[' + index + ']');
+			$field = $('#' + varname.substr(1));
+			if ($field.attr('type') == 'checkbox') {
+				variables[index] = $field.prop('checked');
 			}
 			else {
-				subjects[index] = $subject.val();
+				variables[index] = $field.val();
 			}
 		});
-		//evaluate and return
+		console.log("code: " + code);
+		console.log("variables: " + variables);
+		try
+		{
+			var retval = eval(code);
+			console.log("Result is: " + retval + " .Which is " + retval ? "true" : "false");
+			return (retval);
+		}
+		catch (e)
+		{
+			// This means the pise code snippet or our handling of it needs to be fixed.
+			console.log("Error evaluating: " + code);
+			console.log(e.message);
+			alert("Error evaluating: " + code + ".  Error is: " + e.message);
+			return 0;
+		}
 		return(eval(code));
 	}
 	//end of function: resolve
 
 	//resolves a control
-	function resolveControl(control) {
+	function resolveControl(control) 
+	{
+		console.log("resolveControl" );
 		var variables = control.code.match(/\$\w+/g);
 		return(resolve(control.code, variables));
 	}
-	//end of function: resolveControl
 
 	//appends element to form
 	/*
@@ -240,14 +312,15 @@ var pise_tool = (function() {
 		data: observer data
 		container: css selector, containing element
 	*/
-	function insertElement($node, options) {
-		var type = $node.attr('type');
+	function insertElement($node, options) 
+	{
+		var paramType = $node.attr('type');
 		//parameter is a dropdown
 		var vlist = false;
 		//parameter is a paragraph
 		var para = false;
 		//assign appropriate input type based on parameter type
-		switch (type) {
+		switch (paramType) {
 			case 'Integer':
 				type = 'type="text" ';
 				break;
@@ -279,8 +352,9 @@ var pise_tool = (function() {
 				type = 'type="text" ';
 		}
 		//determine element values
-		var name= 'name="' + $node.children('name').text() + '" '
-		var id = 'id="' + $node.children('name').text() + '" ';
+		var elementID = $node.children('name').text();
+		var name= 'name="' + elementID +  '" '
+		var id = 'id="' + elementID + '" ';
 		var disabled = (options.disabled) ? 'disabled' : '';
 		var data = (options.data) ? 'data-sub="' + options.data.subjects + '" data-code="' + options.data.code + '" ' : '';
 
@@ -317,6 +391,10 @@ var pise_tool = (function() {
 		}
 		//and append elements to specified container
 		$(options.container).append("<div class='form-group'>" + text + eString + "</div>");
+
+		// Store type with each element.
+		var element = $('#' + elementID);
+		element.data('type', paramType);
 	}
 	//end of function: insertElement
 
