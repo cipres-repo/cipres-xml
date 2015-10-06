@@ -1,219 +1,289 @@
 /*
-	TODO: I don't think vdefs are being used.
-	Basic data types (int, float) aren't being validated.
-		I think this needs to be done before preconds are eval'd so we don't try to
-		compare strings and ints.
-	
+	TODO: 
+		- How does the portal initialze Lists and Excls that don't have vdefs?
+
+		- Set maxlength for input fields.  In portal it's 600.
+
+		- Add help text (as hover?  also as a link.)  An element's label should be an href link to 
+		its help text and the help text should have a link back to the element. 
+
+		- Validation on submit:
+			- validate that required fields are all present and not disabled.
+			- need to validate pise min/max when they appear for Integer and Float types.
+			- should we find and report all errors at once, rather than one at a time? 
+			- Or if reporting a single error, return focus to the element that caused the error.
+
+		- "Submitting" the form.  See comments at serialzeArray().  It isn't exactly what we
+		need to do.
+
+		- In insertElement() I corrected handling of "List" pise type.  It should be a multiple select
+		control.  It is correct now but looks terrible.  Fix appearance?  To see it in action, choose
+		tool = muscle and scroll down to "Diagonal Functions".
+
+		- Paragraphs:
+			- Can paragraphs have preconds that affect all params in the paragraph?
+			- I don't think we need simple and advanced divs within paragraphs.  I think the only issimple we
+			need to pay attention to would be one on the top level parameter enclosing the parapgraph.  In other
+			words, the whole paragraph is either in the simple or advanced section.
+
+		- Excl type: when there are less than 4 choices (check on this, it may be less than 3) it is done
+		as a radio button in cipres.  For example, see probalign "Sequence Type" in the portal.  If we
+		do the same here, note that special handling may be required to disable/enable and get the value
+		of radio button controls.
+
+		- I want to set an attribute on the whole form-group that includes the label and the
+		input/select element, when the element is disabled.  That way we can do different css styling 
+		(in a stylesheet) for enabled/disabled field groups.  In particular I'd like to try changing the 
+		label text to light gray when disabled.  It's too hard for me to see which fields are disabled.
+
+		- Simple and Advanced headers should collapse and expand their sections.  Initially Simple is expanded 
+		and Advanced is collapsed.  Same as in the portal.
+
+
+	Cheatsheet for Terri:
+		- $ is an alias for jQuery in many contexts.  For example $(container) means jQuery(container).
+		- javascript lets you use '$' in variable names.  It's a jquery convention to have var name
+			start with $ when it refers to a jquery object.  For example: $field = $(#field_id)
+		- There are lots of ways to select jQuery objects:
+			$("#name") = element with id = "name"
+			$(".foo") = elements with class "foo"
+			$("p") = all <p> elements
+		- all jquery objects (form fields, divs, etc) have a data(name, value) method that 
+		lets you associate arbitrary data with the object.  Attributes in the html of the form "data-X=y"
+		can be retrieved with .data('X').
+		- jQuery supports "fluent" or "chained" method calls where most methods return
+		the object they were called on.
+		- Can't use continue and break in JQuery each loop.  You need to return true (continue) or false (break)
+		from the function instead.
+		- empty string is false.
+		- The css id of each element in the form is the same as the name of the corresponding pise parameter.
 */
 var pise_tool = (function() {
 	var toolObj = {};
-	//observer map and controls array
-	var observerMap = null;
-	var controlsArray = null;
-	//expose tool-rendering function
+	var formSelector;
+
+
 	/*
 		tool-rendering function
 		url: pise url of tool
-		container: css selector (string) for html container
+		container: css selector (string) for html container that is to contain the form
 		callback: function to be executed with 
 	*/
-	toolObj.render_tool = function(url, container, callback) {
-		//empty container
-		$(container).empty();
-		//subject -> observer(s)
-		observerMap = {};
-		//array of controls
-		controlsArray = [];
-		//parameter filter
+	toolObj.render_tool = function(url, container, callback) 
+	{
+		$(container).empty();	
 		var paramFilter = "parameter:not([ishidden='1']):not([type='Results']):not([type='OutFile'])";
 
 		//create form element
-		$(container)
-			.append("<form></form>")
-			.children('form')
-			//append simple and advanced containers
-			.append("<div class='simple'></div><div class='advanced'></div>");
-		container = container + " form";
+		$(container).append("<form></form>").children('form').
+			append("<div class='simple'></div><div class='advanced'></div>");
 
-		//container reference
+		// Set container to css selector for the form 
+		container = container + " form";
+		formSelector = container;
+
+		// selectors for the simple and advanced divs.  E.g. $(containers.simContainer) is the simple container.
 		var containers = {
 			simContainer: container + " > div.simple",
 			advContainer: container + " > div.advanced"
 		};
 
-		//retrieve pisexml file
-		$.ajax({
-			url: url,
-			type: 'GET',
-	    dataType: 'xml'
-		})
-		//generate input elements
-		.then(function(data) {
+		//retrieve pisexml file.  Callback fn creates form elements from pisexml parameters.
+		$.ajax({ url: url, type: 'GET', dataType: 'xml' }).then(function(data) 
+		{
 			//iterate through parameters
 			$(data)
 				.children()
 				.children("parameters")
-				.children(paramFilter).each(function(index, value) {
+				.children(paramFilter).each(function(index, value) 
+				{
 					var $value = $(value);
-					//paragraph parameters
-					if($value.attr('type') == 'Paragraph') {
+					if($value.attr('type') == 'Paragraph') 
+					{
 						var id = $value.children('paragraph').children('name').text();
-						//insert paragraph
-						insertToForm(value, observerMap, controlsArray, containers, true);
-						//insert paragraph elements
-						$value.children('paragraph').children('parameters').children(paramFilter).each(function(index, value) {
-							insertToForm(value, observerMap, controlsArray, {
-								simContainer: "div#" + id + " > div.simple",
-								advContainer: "div#" + id + " > div.advanced"
-							}, false);
+						insertToForm(value, containers, true);
+						$value.children('paragraph').children('parameters').children(paramFilter).each(function(index, value) 
+						{
+							insertToForm(
+								value, 
+								{
+									simContainer: "div#" + id + " > div.simple",
+									advContainer: "div#" + id + " > div.advanced"
+								}, 
+								false);
 						});
 					}
-					//other parameters
 					else {
-						insertToForm(value, observerMap, controlsArray, containers, false);
+						insertToForm(value, containers, false);
 					}
 			});
-			//bind subjects in observermap to observers
-			for (var prop in observerMap) {
-				var selector = '#' + prop.substr(1);
-				$(selector).data('obs', observerMap[prop].toString())
-					//notify observers on status change
-					.change(notifyObservers)
-					//initial notiiication to observers
-					.trigger('change');
-			}
 			//append submit button
 			$(container).append('<input type="submit" value="submit">');
-		});
-		//finished generating input elements
 
-		//Form submission
-		$(container).unbind().submit(function(e) {
+			// Enable/disable elements based on their preconds.
+			resolveParameters(null);
+		});
+
+		// Define what happens when form is submitted.
+		$(container).unbind().submit(function(e) 
+		{
 			e.preventDefault();
 			var error = false;
-
 			/* 
-				TODO: also validate required fields present
-				should find and report all errors at once.
-
-				Validate controls on empty string is not working the same as on portal.
+				Validate datatype for 'Integer' and 'Float' parameters.  This is why we have data('pisetype') stored
+				with each input element.  
 			*/
-
 			$(container).find('input').each(function()
 			{
-				var type = $(this).data('type');
+				var type = $(this).data('pisetype');
 				var id = $(this).attr('id');
 				var value = $(this).val();
 				//if (type && (type == 'Integer'))
 				if (type && (type == 'Integer'))
 				{
-					if ( ! /^(0|[1-9]\d*)$/.test(str) )
+					if ( value && ! /^(0|[1-9]\d*)$/.test(value) )
 					{
 						console.log("field with id=" + id + " is not an integer");
 						alert(id + " must be a positive integer.");
-						return false;
+						error = true;
+						//return false;
 					}
 						
 				} else if (type && (type == 'Float'))
 				{
-					if ( ! /^\s*(\+|-)?((\d+(\.\d+)?)|(\.\d+))\s*$/.test(value) )
+					if ( value && ! /^\s*(\+|-)?((\d+(\.\d+)?)|(\.\d+))\s*$/.test(value) )
 					{
 						console.log("field with id=" + id + " is not float");
 						alert(id + " must be a decimal number.");
-						return false;
+						error = true;
+						//return false;
 					}
 				} 
 				
 			});
 
-
-			//evaluate the controls
-			$.each(controlsArray, function(index, value) {
-				if (resolveControl(value)) 
+			// iterate over all form elements that have controls 
+			var elementsWithCtrls= $('*').filter(function() { return $(this).data('ctrls') !== undefined; });
+			$.each(elementsWithCtrls, function() 
+			{
+				if (!isDisabled($(this).attr('id')))
 				{
-					alert(value.message);
-					error = true;
-					return false;
+					var ctrls = $(this).data('ctrls');
+					var i;
+					for (i = 0; i < ctrls.length; i++)
+					{
+						var code = ctrls[i].code;
+						var message = ctrls[i].message;
+						if (resolveCode($(this), code))
+						{
+							console.log(message);
+							alert(message);
+							error = true;
+							//return false;
+						}
+					}
 				}
 			});
-			//execute callback if no errors
-			if (!error) {
+
+			/*
+				execute callback if no errors.  Ideally I think we'd collect and report all errors at once, though only 
+				one error per each field.  For instance if runtime="foo", you wouldn't want to report 
+				"runtime must be a number" and "runtime must be > .1"
+			*/
+			if (!error) 
+			{
+				/*
+					print all elements/values.  Includes submit button and input source element, which don't have id attributes. 
+					I'm just doing this to compare it with what serializeArray returns.
+				*/
+				console.log("All elements");
+				$(container).find('input, select').each(function()
+				{
+					console.log("id:" + $(this).attr('id') + ", name:" + $(this).attr('name') + ", value=" + $(this).val() + 
+						($(this).prop('disabled') ? ", disabled" : ""));
+				});
+
+				/*
+					- serializeArray apparently omits select elements of type="file"!
+					- It also omits anything that is disabled or has empty string as the value, as it would for a form submission.
+					- The value, of a file control, is just the filename, no path info. Can we get the path info?
+					- Only checked checkboxes are sent. TODO: We need to send value of all checkboxes that aren't disabled.
+						In the cipres portal we use struts and struts has code to work around this so that the action
+						that the form is posted to gets a boolean value for each checkbox.
+				*/
 				callback($(this).serializeArray());
 			}
 		});
 	};
 	//end of toolObj.render_tool
 
-	/// HELPER FUNCTIONS ///
 
-	//inserts individual parameters to form
 	/*
+		inserts individual parameters to form
 		value: xml parameter
-		paragraph: element is a paragraph parameter (boolean)
+		paragraph: boolean - is element is a paragraph parameter ? 
+
+		if parameter  has precond, adds 'precond' to elements data
+		if parameter has ctrls, adds 'ctrls' to elements data 
 	*/
-	function insertToForm(value, observerMap, controlsArray, containers, paragraph) {
-		//default parameters for insertElement
+	function insertToForm(value, containers, paragraph) 
+	{
 		var $node = $(value);
 		var label;
-		if (paragraph) {
+		var precondCode;
+		var ctrl; 
+		var data = null;
+
+		if (paragraph) 
+		{
 			$node = $node.children('paragraph');
 			$node.attr('type', 'Paragraph');
 			label = $node.children('prompt').text();
 		}
-		else {
+		else 
+		{
 			label = $node.children('attributes').children('prompt').text();
 		}
-		var disabled = false;
-		var data = null;
 
+		//append element to html form
+		var element = insertElement($node, 
+			{
+				label: label, 
+				container: ($node.attr('issimple') == 1) ? containers.simContainer : containers.advContainer
+			});		
+
+		/*
+			Associate some data with the input element. Data has these keys:
+				- 'precond'
+				- 'ctrls' 
+				- 'pisetype' (added by insertElement)
+		*/
+		// There is only one precond element per parameter, at most
 		var $precond = $node.children('attributes').children('precond');
-		//node has precondition, add to observer map
-
-		if ($precond.length) {
-			var observer = $node.children('name').text();
-			var code = $precond.children('code').text();
-			//find all variables beginning with $
-			var subjects = code.match(/\$\w+/g);
-			//populate observer map
-			$.each(subjects, function(index, value) {
-				if ( observerMap[value] ) {
-					observerMap[value].push(observer);
-				}
-				else {
-					observerMap[value] = [observer];
-				}
-			});
-			//adjust parameters
-			disabled = true;
-			data = {
-				code: sanitizeCode(code),
-				subjects: subjects.join()
-			};
+		if ($precond.length) 
+		{
+			precondCode = $precond.children('code').text();
+			element.data('precond', sanitizeCode(precondCode));
 		}
-		//node has controls
+
+		//node can have multiple ctrl elements 
 		var $controls = $node.children('attributes').children('ctrls').children('ctrl');
-		if ($controls.length) {
-			$.each($controls, function(index, value) {
+		if ($controls.length) 
+		{
+			ctrl = [];
+			$.each($controls, function(index, value) 
+			{
 				var $value = $(value);
-				//push control and its relevant properties to controlsArray
-				controlsArray.push({
+				ctrl.push({
 					message: $value.children('message').text(),
-					code: sanitizeCode($value.children('code').text()),
+					code: sanitizeCode($value.children('code').text())
 				});
 			});
+			element.data('ctrls', ctrl);
 		}
-	
-		//append element to html form
-		insertElement($node, {
-			label: label, 
-			disabled: disabled,
-			data: data,
-			container: ($node.attr('issimple') == 1) ? containers.simContainer : containers.advContainer
-		});		
 	}
-	//end of function: insertToForm
 
-	//use this function to replace invalid perl code
+	//convert perl code snippet to javascript
 	function sanitizeCode(code) {
 		return code
 			.replace(/!defined */g, '!')
@@ -226,63 +296,45 @@ var pise_tool = (function() {
 			.replace(/\//g, 'PLACEHOLDER')
 			.replace(/.searchPLACEHOLDER/g, '.search(/')
 			.replace(/PLACEHOLDER/g, '/) > -1');
-			;
 	}
-	//end of function: sanitizeCode
 
-	//notifies all observers of value change
-	function notifyObservers() {
-		var observers = $(this).data('obs').split(',');
-		$.each(observers, notify);
-	}
-	//end of function: notifyObservers
-
-	//notifies single observer
-	function notify(index, value) {
-		$value = $('#' + value);
-		var subjects = $value.data('sub').split(',');
-		var code = $value.data('code');
-		//modify child elements if paragraph
-		if ($value.hasClass('paragraph')) {
-			$value.children().prop('disabled', !resolve(code, subjects));
-		}
-		else
-			$value.prop('disabled', !resolve(code, subjects));
-	}
-	//end of function: notify
 
 	/*
 		evaluate perl code snippets that have been  converted to javascript
-		variables is an array of the parameter names that are used as variables in the code snippet.
-		Used for pise precond and ctrl elements.
+		- the html element the code is associated with (for resolving "$value" in code string) 
+		- code is the code to eval 
 	*/
-	function resolve(code, variables) {
-		console.log("Initial code: " + code);
-		console.log("Initial variables: " + variables);
+	function resolveCode(element, code) 
+	{
 
-		/*
-			replace variables in code with reference to variables array
-			and then replace elements of variables array with their values
-			So code starts out looking like: ($p1 > $p2) and we change this to: ($variables[0] > $variables[1])
-			variables[] on entry to this fn looks like: ["$p1", "$p2"] and we change it to something like: [3, 5]
-		*/
-		$.each(variables, function(index, varname) {
-			code = code.replace(varname, 'variables[' + index + ']');
-			$field = $('#' + varname.substr(1));
-			if ($field.attr('type') == 'checkbox') {
-				variables[index] = $field.prop('checked');
+		//	replace variables in code 
+		var variables = code.match(/\$\w+/g);
+		//console.log("resolveCode for element: " +  element.attr('id') + " , code: " + code);
+
+		$.each(variables, function(index, varname) 
+		{
+			var id;
+			var tmp;
+			if (varname == "value")
+			{
+				id  = element.attr('id');
+
+				// just for debugging
+				//tmp = getValue(id);
+			} else
+			{
+				id  = varname.substr(1);
+				// just for debugging
+				//tmp = getValue(id);
 			}
-			else {
-				variables[index] = $field.val();
-			}
+			code = code.replace(varname, "getValue('" + id + "')");
 		});
-		console.log("code: " + code);
-		console.log("variables: " + variables);
+		//console.log("Modified code: " + code);
 		try
 		{
 			var retval = eval(code);
-			console.log("Result is: " + retval + " .Which is " + retval ? "true" : "false");
-			return (retval);
+			//console.log("Result is: " + retval);
+			return retval;
 		}
 		catch (e)
 		{
@@ -294,109 +346,254 @@ var pise_tool = (function() {
 		}
 		return(eval(code));
 	}
-	//end of function: resolve
 
-	//resolves a control
-	function resolveControl(control) 
-	{
-		console.log("resolveControl" );
-		var variables = control.code.match(/\$\w+/g);
-		return(resolve(control.code, variables));
-	}
 
-	//appends element to form
 	/*
+		Appends an html element to the form.  The element's id comes from the name of the pise parameter.
+
+		$node: pisexml parameter
 		options:
-		label: label for the element
-		disabled: true -> element is disabled
-		data: observer data
-		container: css selector, containing element
+			label: label for the element
+			container: css selector of the containing element
 	*/
 	function insertElement($node, options) 
 	{
 		var paramType = $node.attr('type');
-		//parameter is a dropdown
 		var vlist = false;
-		//parameter is a paragraph
+		var multipleSelect = false;
 		var para = false;
-		//assign appropriate input type based on parameter type
+		var typeAttr;
+
+
 		switch (paramType) {
 			case 'Integer':
-				type = 'type="text" ';
+				typeAttr = 'type="text" ';
 				break;
 			case 'Float':
-				type = 'type="text" ';
+				typeAttr = 'type="text" ';
 				break;
 			case 'String':
-				type = 'type="text" ';
+				typeAttr = 'type="text" ';
 				break;
 			case 'Switch':
-				type = 'type="checkbox" ';
+				typeAttr = 'type="checkbox" ';
 				break;
 			case 'Excl':
 				vlist = true;
 				break;
 			case 'List':
 				vlist = true;
+				multipleSelect = true;
 				break;
 			case 'Sequence':
-				type = 'type="file" ';
+				typeAttr = 'type="file" ';
 				break;
 			case 'InFile':
-				type = 'type="file" ';
+				typeAttr = 'type="file" ';
 				break;
 			case 'Paragraph':
 				para = true;
 				break;
 			default: 
-				type = 'type="text" ';
+				typeAttr = 'type="text" ';
 		}
 		//determine element values
 		var elementID = $node.children('name').text();
 		var name= 'name="' + elementID +  '" '
 		var id = 'id="' + elementID + '" ';
-		var disabled = (options.disabled) ? 'disabled' : '';
-		var data = (options.data) ? 'data-sub="' + options.data.subjects + '" data-code="' + options.data.code + '" ' : '';
 
 		var eString = null;
-		//generate paragraph
-		if (para) {
-			eString = "<div " + name + id + data + disabled + "class='paragraph'>";
+		var text;
+
+		// Insert divs and heading for a paragraph
+		if (para) 
+		{
+			eString = "<div " + name + id + "class='paragraph'>";
 			eString += "<div class='simple'></div><div class='advanced'></div>";
 			eString += "</div>";
-		}
-		//generate dropdown
-		else if (vlist) {
-			//select element
-			eString = "<select " + name + id + data + disabled + ">";
-			//options
-			$.each($node.find('vlist').children('value'), function(index, value) {
-				var $val = $(value);
-				eString += "<option value='" + $val.text() + "'>" + $val.next().text() + "</option>";
-			});
-			//end select element
-			eString += "</select><br>";
-		}
-		//generate input
-		else {
-			eString = "<input " + name + id + type + data + disabled  + "><br>";
-		}
-		var text;
-		//create label or heading
-		if (para) {
 			text = "<h4>" + options.label + "</h4>";
-		}
-		else {
-			text = "<label>" + options.label + "</label>";
-		}
-		//and append elements to specified container
-		$(options.container).append("<div class='form-group'>" + text + eString + "</div>");
+			$(options.container).append("<div class='form-group'>" + text + eString + "</div>");
+		} else
+		{
 
-		// Store type with each element.
+			if (vlist) //generate select
+			{
+				//select element
+				if (multipleSelect) 
+				{
+					eString = "<select multiple "
+				} else
+				{
+					eString = "<select "
+				}
+				eString +=  ( name + id +   ">" );
+				//options
+				$.each($node.find('vlist').children('value'), function(index, value) {
+					var $val = $(value);
+					eString += "<option value='" + $val.text() + "'>" + $val.next().text() + "</option>";
+				});
+				eString += "</select><br>";
+			} else //generate input
+			{
+				eString = "<input " + name + id + typeAttr +  "><br>";
+			}
+			text = "<label>" + options.label + "</label>";
+			$(options.container).append("<div class='form-group'>" + text + eString + "</div>");
+		}
+		// Store pise datatype with each element.
 		var element = $('#' + elementID);
-		element.data('type', paramType);
+		element.data('pisetype', paramType);
+
+		// When any element changes, call resolveParameters
+		element.change({source: elementID}, resolveParameters);
+
+		//console.log("Getting default value of " + elementID);
+		var defaultValue = getDefaultValue($node);
+		//console.log("Default value is: " + defaultValue);
+
+		// Set default value
+		if (defaultValue != null)
+		{
+			if (paramType == "Switch")
+			{
+				element.prop('checked', defaultValue);
+			} else
+			{
+				element.val(defaultValue);
+			}
+		}
+		return element;
 	}
-	//end of function: insertElement
+
+	/*
+		If pise xml parameter $node has a vdef element, returns its value.  
+			- For "Lists" (but not "Excls") this will be an array of strings
+			- For "Switch" it will be a boolean
+			- Otherwise it's a string.
+			- If no vdef element, returns null.
+
+		- I believe Lists are the only pise parameters that can have multiple <value> 
+		elements in a <vdef> element and there should be only one <vdef> per parameter.
+		The clustalw hgapresidue parameter is a List with multiple vdef values.
+
+		- Sometimes vdef values are within double quotes in the pise and the double quotes
+		need to be stripped off.  
+	*/
+	function getDefaultValue($node)
+	{
+		var vdef = $node.children('attributes').children('vdef').children('value');
+		var paramType = $node.attr('type');
+		var defaultValue = null;
+		var defaultValueArray = [];
+		if (vdef)
+		{
+			var value;
+			$(vdef).each(function() 
+			{
+				value = $(this).text();
+				// remove leading and trailing double quotes.  TODO: better way to do this?
+				value = value.replace("/", "");
+				value = value.replace(/"([^"]*)$/,'$1');
+				if (paramType == "List")
+				{
+					defaultValueArray.push(value);
+				} else if (!defaultValue)
+				{
+					defaultValue = value;
+					if (paramType == "Switch")
+					{
+						defaultValue = (defaultValue == "1") ? true : false;
+					}
+				}
+			});
+			return (paramType == "List") ? defaultValueArray : defaultValue;
+		} else
+		{
+			return null;
+		}
+	}
+
+	// Called whenever any element's value changes.  
+	function resolveParameters(event)
+	{
+		// iterate over all form elements that have preconds and enable/disable them
+		var elementsWithPreconds = $('*').filter(function() { return $(this).data('precond') !== undefined; });
+		$.each(elementsWithPreconds, function() {
+			var precondStr = $(this).data('precond');
+			disable( $(this).attr('id'),  !resolveCode($(this), precondStr));
+		});
+	}
+
+	/*
+		Disable or enable a form element
+		- parameter is name of parameter (i.e. element's 'id' attribute)
+		- flag is a boolean
+	*/
+	function disable(parameter, flag)
+	{
+		var element = $('#' + parameter);
+		if (element)
+		{
+			element.prop('disabled', flag); 
+		}
+	}
+
+	/*
+		- parameter is name of parameter (i.e. element's 'id' attribute)
+	*/
+	function isDisabled(parameter)
+	{
+		var element = $('#' + parameter);
+		if (element == null)
+		{
+			return true;
+		}
+		var isDisabled = element.prop('disabled');
+		return isDisabled;
+	}
+
+	/*
+		Get the value of a form element
+		- parameter is name of parameter (i.e. element's 'id' attribute)
+		- for multiple select list (pise type "Excl") this only returns
+		the first value in the list.  In cipres portal, that works ok where we 
+		call getValue() but we aren't using getValue to submit the form elements,
+		only to verify preconds and controls.
+	*/
+	function getValue(parameter)
+	{
+		var element = $('#' + parameter);
+
+		if (element == null)
+		{
+			return null;
+		}
+		// For checkbox type (i.e. a pise Switch) always return true or false
+		if (element.prop('type') == 'checkbox')
+		{
+			if (isDisabled(parameter))
+				return false;
+			return element.is(":checked");
+		}
+
+		// For all other types, if disabled, return empty string
+		if (isDisabled(parameter))
+		{
+			return "";
+		}
+		if (element.prop('type') == 'multipleSelect')
+		{
+			var selections = element.val();
+			if (selections)
+			{
+				if (selections[0])
+					return selections[0];
+			}
+			return "";
+		}
+		var retval = element.val();
+		return retval;
+	}
 
 	return toolObj;
 
