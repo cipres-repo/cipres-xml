@@ -193,14 +193,29 @@ var pise_tool = (function() {
 			if (!error) 
 			{
 				/*
-					print all elements/values.  Includes submit button and input source element, which don't have id attributes. 
-					I'm just doing this to compare it with what serializeArray returns.
+					Build list of vparams and iparams that the rest api will need.
 				*/
-				console.log("All elements");
+				var vparams = {};
+				var iparams = {};
 				$(container).find('input, select').each(function()
 				{
-					console.log("id:" + $(this).attr('id') + ", name:" + $(this).attr('name') + ", value=" + $(this).val() + 
-						($(this).prop('disabled') ? ", disabled" : ""));
+					var id = $(this).attr('id');
+					if (!isDisabled(id)) 
+					{
+						var value = $(this).val();
+						if (value == '')
+						{
+							return;
+						}
+						var type = $(this).data('pisetype');
+						if (type == 'InFile' || type == 'Sequence')
+						{
+							iparams[id] = value;
+						} else
+						{
+							vparams[id] = value;
+						}
+					}
 				});
 
 				/*
@@ -211,7 +226,8 @@ var pise_tool = (function() {
 						In the cipres portal we use struts and struts has code to work around this so that the action
 						that the form is posted to gets a boolean value for each checkbox.
 				*/
-				callback($(this).serializeArray());
+				//callback($(this).serializeArray());
+				callback(iparams, vparams);
 			}
 		});
 	};
@@ -544,7 +560,10 @@ var pise_tool = (function() {
 	function isDisabled(parameter)
 	{
 		var element = $('#' + parameter);
-		if (element == null)
+
+		// JQuery always returns a jquery object, even when the id (or other select) isn't found.
+		// It's length will be zero iff not found.
+		if (element.length == 0)
 		{
 			return true;
 		}
@@ -564,7 +583,7 @@ var pise_tool = (function() {
 	{
 		var element = $('#' + parameter);
 
-		if (element == null)
+		if (element.length == 0)
 		{
 			return null;
 		}

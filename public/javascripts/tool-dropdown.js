@@ -1,11 +1,12 @@
 $(document).ready(function() {
+	console.log("here I am");
 	//cipres tool API url
 	var tool_url = 'https://bumper.sdsc.edu/cipresrest/v1/tool';
 	//retrieve tools xml
 	$.ajax({
 		url: tool_url,
 		type: 'GET',
-    dataType: 'xml'
+		dataType: 'xml'
 	})
 	//render dropdown
 	.then(function(data){
@@ -24,9 +25,25 @@ $(document).ready(function() {
 		$('.tools').append(list);
 		//render new tool on value change
 		$("#toolselector").change(function() {
-			pise_tool.render_tool($(this).val(), ".container", function(data) {
+			pise_tool.render_tool($(this).val(), ".container", function(iparams, vparams) {
 				console.log("form submitted.")
-				console.log(data);
+				console.log("IPARAMS:");
+				var key;
+				for (key in iparams)
+				{
+					if (iparams.hasOwnProperty(key))
+					{
+						console.log(key + "=" + iparams[key]);
+					}
+				}
+				console.log("VPARAMS:");
+				for (key in vparams)
+				{
+					if (vparams.hasOwnProperty(key))
+					{
+						console.log(key + "=" + vparams[key]);
+					}
+				}
 			});
 			//add source file option to form
 			$(".container form").prepend("<label>Input source:</label>" + 
