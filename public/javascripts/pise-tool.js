@@ -203,7 +203,8 @@ var pise_tool = (function() {
 					if (!isDisabled(id)) 
 					{
 						var value = $(this).val();
-						if (value == '')
+						
+						if (value == null || value == '')
 						{
 							return;
 						}
@@ -219,15 +220,12 @@ var pise_tool = (function() {
 				});
 
 				/*
-					- serializeArray apparently omits select elements of type="file"!
-					- It also omits anything that is disabled or has empty string as the value, as it would for a form submission.
-					- The value, of a file control, is just the filename, no path info. Can we get the path info?
-					- Only checked checkboxes are sent. TODO: We need to send value of all checkboxes that aren't disabled.
-						In the cipres portal we use struts and struts has code to work around this so that the action
-						that the form is posted to gets a boolean value for each checkbox.
+					Pass the parameter dictionaries as json strings because this callback
+					may actually be a *java* function in a javafx application, like
+					desktop-cipres, and json seems to be a fairly easy way to exchange
+					data between javascript and java.
 				*/
-				//callback($(this).serializeArray());
-				callback(iparams, vparams);
+				callback(JSON.stringify(iparams), JSON.stringify(vparams));
 			}
 		});
 	};

@@ -23,28 +23,13 @@ $(document).ready(function() {
 		list += "</select><br>";
 		//append to tools div
 		$('.tools').append(list);
+
+
 		//render new tool on value change
 		$("#toolselector").change(function() {
-			pise_tool.render_tool($(this).val(), ".container", function(iparams, vparams) {
-				console.log("form submitted.")
-				console.log("IPARAMS:");
-				var key;
-				for (key in iparams)
-				{
-					if (iparams.hasOwnProperty(key))
-					{
-						console.log(key + "=" + iparams[key]);
-					}
-				}
-				console.log("VPARAMS:");
-				for (key in vparams)
-				{
-					if (vparams.hasOwnProperty(key))
-					{
-						console.log(key + "=" + vparams[key]);
-					}
-				}
-			});
+
+			pise_tool.render_tool($(this).val(), ".container", theCallback);
+
 			//add source file option to form
 			$(".container form").prepend("<label>Input source:</label>" + 
 				"<select name=source><option>Kepler director</option><option>web upload</option></select><br>");
@@ -54,3 +39,39 @@ $(document).ready(function() {
 		});
 	});
 });
+
+
+/*
+	We expect the caller to provide the callback fn when calling pise_tool.render_tool.
+	A javascript app should be able to do that by setting theCallback variable after
+	including this file (TODO: test this).  Desktop-cipres, an example java desktop
+	app, setts theCallback to a java method.  The two parameters i and v are dictionaries
+	of the input and vparam fields expected by the rest api.  We pass them
+	as json strings so that they can be easily accessed in java as well as javascript.
+*/
+var theCallback = defaultCallback;
+
+function defaultCallback(i, v)
+{
+	var iparams = $.parseJSON(i);
+	var vparams = $.parseJSON(v);
+
+	console.log("form submitted.")
+	console.log("IPARAMS:");
+	var key;
+	for (key in iparams)
+	{
+		if (iparams.hasOwnProperty(key))
+		{
+			console.log(key + "=" + iparams[key]);
+		}
+	}
+	console.log("VPARAMS:");
+	for (key in vparams)
+	{
+		if (vparams.hasOwnProperty(key))
+		{
+			console.log(key + "=" + vparams[key]);
+		}
+	}
+}
