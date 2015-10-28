@@ -60,8 +60,8 @@
 */
 var pise_tool = (function() {
 	var toolObj = {};
-	var formSelector;
-
+	//parameter filter
+	var paramFilter = "parameter:not([ishidden='1']):not([type='Results']):not([type='OutFile'])";
 
 	/*
 		tool-rendering function
@@ -70,22 +70,25 @@ var pise_tool = (function() {
 		callback: function to be executed with 
 	*/
 	toolObj.render_tool = function(url, container, callback) 
-	{
-		$(container).empty();	
-		var paramFilter = "parameter:not([ishidden='1']):not([type='Results']):not([type='OutFile'])";
-
+	{	
 		//create form element
-		$(container).append("<form></form>").children('form').
-			append("<div class='simple'></div><div class='advanced'></div>");
+		$(container)
+			.empty()
+			.append("<form></form>")
+			.append("<dl class='comment'></dl>")
+			//add simple and advanced containers to form
+			.children('form')
+			.append("<div class='simple'></div>" +
+					"<div class='advanced'></div>");
 
 		// Set container to css selector for the form 
-		container = container + " form";
-		formSelector = container;
+		var $container = $(container + " form");
 
 		// selectors for the simple and advanced divs.  E.g. $(containers.simContainer) is the simple container.
 		var containers = {
-			simContainer: container + " > div.simple",
-			advContainer: container + " > div.advanced"
+			simContainer: container + " form > div.simple",
+			advContainer: container + " form > div.advanced",
+			comContainer: $(container + " > dl.comment")
 		};
 
 		//retrieve pisexml file.  Callback fn creates form elements from pisexml parameters.
@@ -107,8 +110,9 @@ var pise_tool = (function() {
 							insertToForm(
 								value, 
 								{
-									simContainer: "div#" + id + " > div.simple",
-									advContainer: "div#" + id + " > div.advanced"
+									simContainer: "div#" + id,
+									advContainer: "div#" + id,
+									comContainer: containers.comContainer
 								}, 
 								false);
 						});
@@ -118,10 +122,26 @@ var pise_tool = (function() {
 					}
 			});
 			//append submit button
-			$(container).append('<input type="submit" value="submit">');
+			$container.append('<input type="submit" value="submit">');
 
 			// Enable/disable elements based on their preconds.
 			resolveParameters(null);
+
+			//add collapse headings to simple and advanced containers
+			$container.children("div.simple")
+				.before("<h2 class='container-header'>Simple Params</h2>")
+				.prev()
+				.click(function() { $(this).next().slideToggle() });
+			$container.children("div.advanced")
+				.before("<h2 class='container-header'>Advanced Params</h2>")
+				.prev()
+				.click(function() { $(this).next().slideToggle() })
+				.click();
+			$container.next('dl.comment')
+				.before("<h2 class='container-header'>Help</h2>")
+				.prev()
+				.click(function() { $(this).next().slideToggle() })
+				.click();
 		});
 
 		// Define what happens when form is submitted.
@@ -217,7 +237,6 @@ var pise_tool = (function() {
 	};
 	//end of toolObj.render_tool
 
-
 	/*
 		inserts individual parameters to form
 		value: xml parameter
@@ -232,24 +251,29 @@ var pise_tool = (function() {
 		var label;
 		var precondCode;
 		var ctrl; 
-		var data = null;
+		var data;
+		var comment;
 
 		if (paragraph) 
 		{
 			$node = $node.children('paragraph');
 			$node.attr('type', 'Paragraph');
 			label = $node.children('prompt').text();
+			comment = $node.children('comment').text();
 		}
 		else 
 		{
 			label = $node.children('attributes').children('prompt').text();
+			comment = $node.children('attributes').children('comment').text();
 		}
 
 		//append element to html form
 		var element = insertElement($node, 
 			{
 				label: label, 
-				container: ($node.attr('issimple') == 1) ? containers.simContainer : containers.advContainer
+				comment: comment,
+				container: ($node.attr('issimple') == 1) ? containers.simContainer : containers.advContainer,
+				comContainer: containers.comContainer
 			});		
 
 		/*
@@ -344,7 +368,7 @@ var pise_tool = (function() {
 			alert("Error evaluating: " + code + ".  Error is: " + e.message);
 			return 0;
 		}
-		return(eval(code));
+		//return(eval(code));
 	}
 
 
@@ -399,20 +423,17 @@ var pise_tool = (function() {
 		}
 		//determine element values
 		var elementID = $node.children('name').text();
-		var name= 'name="' + elementID +  '" '
+		var name= 'name="' + elementID +  '" ';
 		var id = 'id="' + elementID + '" ';
 
-		var eString = null;
+		var eString;
 		var text;
 
 		// Insert divs and heading for a paragraph
 		if (para) 
 		{
-			eString = "<div " + name + id + "class='paragraph'>";
-			eString += "<div class='simple'></div><div class='advanced'></div>";
-			eString += "</div>";
-			text = "<h4>" + options.label + "</h4>";
-			$(options.container).append("<div class='form-group'>" + text + eString + "</div>");
+			eString = "<div " + name + id + "class='paragraph'></div>";
+			text = "<h4 id='" + elementID + "-lab'>" + options.label + "</h4>";
 		} else
 		{
 
@@ -435,11 +456,12 @@ var pise_tool = (function() {
 				eString += "</select><br>";
 			} else //generate input
 			{
-				eString = "<input " + name + id + typeAttr +  "><br>";
+				eString = "<input " + name + id + typeAttr +  " maxlength='600'><br>";
 			}
-			text = "<label>" + options.label + "</label>";
-			$(options.container).append("<div class='form-group'>" + text + eString + "</div>");
+			text = "<label id='" + elementID + "-lab'>" + options.label + "</label>";
+			
 		}
+		$(options.container).append("<div class='form-group'>" + text + eString + "</div>");
 		// Store pise datatype with each element.
 		var element = $('#' + elementID);
 		element.data('pisetype', paramType);
@@ -462,7 +484,27 @@ var pise_tool = (function() {
 				element.val(defaultValue);
 			}
 		}
+		// insert help section
+		insertComment(element.prev('label'),
+		{
+			label: options.label,
+			comment: options.comment,
+			comContainer: options.comContainer
+		});
+
 		return element;
+	}
+
+	function insertComment($eLabel, options) 
+	{	
+		if (options.comment == '')
+			return;
+		var comId = $eLabel.attr('id') + "-com";
+		options.comContainer.append(
+			"<dt id='" + comId + "'><a href='#" + $eLabel.attr('id') + "'>" + options.label + "</a></dt>" +
+			"<dd>" + options.comment + "</dd>"
+		);
+		$eLabel.wrapInner('<a href="#' + comId + '"></a>');
 	}
 
 	/*
@@ -535,6 +577,13 @@ var pise_tool = (function() {
 		if (element)
 		{
 			element.prop('disabled', flag); 
+			if (flag)
+			{
+				element.parent('.form-group').addClass('disabled');
+			} else
+			{
+				element.parent('.form-group').removeClass('disabled');
+			}
 		}
 	}
 

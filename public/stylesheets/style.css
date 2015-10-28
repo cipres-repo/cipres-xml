@@ -6,3 +6,11 @@ body {
 a {
   color: #00B7FF;
 }
+
+.container-header {
+	cursor: pointer;
+}
+
+.form-group.disabled > label {
+	color: #95a5a6;
+}
