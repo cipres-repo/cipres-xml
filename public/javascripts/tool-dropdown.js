@@ -75,3 +75,24 @@ function defaultCallback(i, v)
 		}
 	}
 }
+
+
+/*
+	There are several different use cases where we want to handle pise InFile and Sequence data types in different ways.
+	I'm not sure what a good general purpose solution will look like yet.
+	
+	Initially pise-tool was always rendering InFile and Sequence with <input type="file">.   Javascript can't reliably get the
+	full pathname of the file or read the file to build a rest api submission.
+
+	The first use case I'm addressing here is that of a desktop application where we want to use a java FileChooser
+	dialog.  For the time being, I'm indicating that by setting fileChooserType=desktop.   See desktop-cipres
+	application, which overrides the values of fileChooserType and theFileChooser. 
+*/
+var fileChooserType = "default";
+var theFileChooser = defaultFileChooser;
+
+function defaultFileChooser()
+{
+	console.log("returning foo.txt");
+	return "foo.txt";
+}

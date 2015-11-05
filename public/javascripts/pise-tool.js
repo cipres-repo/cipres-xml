@@ -449,7 +449,18 @@ var pise_tool = (function() {
 				eString += "</select><br>";
 			} else //generate input
 			{
-				eString = "<input " + name + id + typeAttr +  "><br>";
+				//###
+				if (fileChooserType == 'desktop' && (paramType == 'InFile' || paramType == 'Sequence'))
+				{
+					eString = '<a href="" id="link_' + elementID +'" >Select file </a><span class="filename" id="' + 'display_' + elementID + '"' +   '></span>';
+
+					//eString += "<input " + name + id + "style='display:none"      + "><br>";
+					//eString += "<input " + name + id +  "><br>";
+					eString += "<input " + name + id +  " type='hidden'><br>";
+				} else
+				{
+					eString = "<input " + name + id + typeAttr +  "><br>";
+				}
 			}
 			text = "<label>" + options.label + "</label>";
 			$(options.container).append("<div class='form-group'>" + text + eString + "</div>");
@@ -461,10 +472,7 @@ var pise_tool = (function() {
 		// When any element changes, call resolveParameters
 		element.change({source: elementID}, resolveParameters);
 
-		//console.log("Getting default value of " + elementID);
 		var defaultValue = getDefaultValue($node);
-		//console.log("Default value is: " + defaultValue);
-
 		// Set default value
 		if (defaultValue != null)
 		{
@@ -476,6 +484,23 @@ var pise_tool = (function() {
 				element.val(defaultValue);
 			}
 		}
+
+		$('#link_' + elementID).click(function(){
+			var id = this.id.replace(/^link_/, '');
+			if ($('#link_' + id).hasClass('disabled') == true)
+			{
+				return false;
+			}
+			var myval = theFileChooser();
+			if (myval != null)
+			{
+				 $('#display_' +id).text(myval);
+				 $('#' + id).val(myval);
+			}
+			return false;
+		});
+
+
 		return element;
 	}
 
@@ -546,9 +571,14 @@ var pise_tool = (function() {
 	function disable(parameter, flag)
 	{
 		var element = $('#' + parameter);
+
 		if (element)
 		{
 			element.prop('disabled', flag); 
+			if (fileChooserType == 'desktop')
+			{
+				$('#link_' + parameter).toggleClass('disabled', flag);
+			}
 		}
 	}
 
