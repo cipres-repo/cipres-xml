@@ -85,42 +85,48 @@ var pise_tool = (function() {
 		var $container = $(container + " form");
 
 		// selectors for the simple and advanced divs.  E.g. $(containers.simContainer) is the simple container.
-		var containers = {
-			simContainer: container + " form > div.simple",
-			advContainer: container + " form > div.advanced",
+		var containers =
+		{
+			simContainer: $(container + " form > div.simple"),
+			advContainer: $(container + " form > div.advanced"),
 			comContainer: $(container + " > dl.comment")
 		};
 
 		//retrieve pisexml file.  Callback fn creates form elements from pisexml parameters.
-		$.ajax({ url: url, type: 'GET', dataType: 'xml' }).then(function(data) 
-		{
-			//iterate through parameters
-			$(data)
-				.children()
-				.children("parameters")
-				.children(paramFilter).each(function(index, value) 
-				{
-					var $value = $(value);
-					if($value.attr('type') == 'Paragraph') 
+		$
+			.ajax({ url: url, type: 'GET', dataType: 'xml' })
+			.then(function(data) 
+			{
+				//iterate through parameters
+				$(data)
+					.find('pise > parameters > ' + paramFilter)
+					.each(function(index, value) 
 					{
-						var id = $value.children('paragraph').children('name').text();
-						insertToForm(value, containers, true);
-						$value.children('paragraph').children('parameters').children(paramFilter).each(function(index, value) 
+						var $value = $(value);
+						if($value.attr('type') == 'Paragraph') 
 						{
-							insertToForm(
-								value, 
+							insertToForm(value, containers, true);
+							var id = $value.children('paragraph').children('name').text();
+							var paraContainer = $("div#" + id);
+
+							$value
+								.find('paragraph > parameters > ' + paramFilter)
+								.each(function(index, value) 
 								{
-									simContainer: "div#" + id,
-									advContainer: "div#" + id,
-									comContainer: containers.comContainer
-								}, 
-								false);
-						});
-					}
-					else {
-						insertToForm(value, containers, false);
-					}
-			});
+									insertToForm(
+										value, 
+										{
+											simContainer: paraContainer,
+											advContainer: paraContainer,
+											comContainer: containers.comContainer
+										}, 
+										false);
+								});
+						} else
+						{
+							insertToForm(value, containers, false);
+						}
+				});
 			//append submit button
 			$container.append('<input type="submit" value="submit">');
 
@@ -186,15 +192,16 @@ var pise_tool = (function() {
 			var elementsWithCtrls= $('*').filter(function() { return $(this).data('ctrls') !== undefined; });
 			$.each(elementsWithCtrls, function() 
 			{
-				if (!isDisabled($(this).attr('id')))
+				var $this = $(this);
+				if (!isDisabled($this))
 				{
-					var ctrls = $(this).data('ctrls');
+					var ctrls = $this.data('ctrls');
 					var i;
 					for (i = 0; i < ctrls.length; i++)
 					{
 						var code = ctrls[i].code;
 						var message = ctrls[i].message;
-						if (resolveCode($(this), code))
+						if (resolveCode($this, code))
 						{
 							console.log(message);
 							alert(message);
@@ -256,8 +263,10 @@ var pise_tool = (function() {
 
 		if (paragraph) 
 		{
+			/* ??? */
 			$node = $node.children('paragraph');
 			$node.attr('type', 'Paragraph');
+			/* */
 			label = $node.children('prompt').text();
 			comment = $node.children('comment').text();
 		}
@@ -268,7 +277,8 @@ var pise_tool = (function() {
 		}
 
 		//append element to html form
-		var element = insertElement($node, 
+		var element = insertElement(
+			$node, 
 			{
 				label: label, 
 				comment: comment,
@@ -308,7 +318,8 @@ var pise_tool = (function() {
 	}
 
 	//convert perl code snippet to javascript
-	function sanitizeCode(code) {
+	function sanitizeCode(code)
+	{
 		return code
 			.replace(/!defined */g, '!')
 			.replace(/defined */g, ' ')
@@ -322,15 +333,13 @@ var pise_tool = (function() {
 			.replace(/PLACEHOLDER/g, '/) > -1');
 	}
 
-
 	/*
 		evaluate perl code snippets that have been  converted to javascript
 		- the html element the code is associated with (for resolving "$value" in code string) 
 		- code is the code to eval 
 	*/
-	function resolveCode(element, code) 
+	function resolveCode($element, code) 
 	{
-
 		//	replace variables in code 
 		var variables = code.match(/\$\w+/g);
 		//console.log("resolveCode for element: " +  element.attr('id') + " , code: " + code);
@@ -341,7 +350,7 @@ var pise_tool = (function() {
 			var tmp;
 			if (varname == "value")
 			{
-				id  = element.attr('id');
+				id  = $element.attr('id');
 
 				// just for debugging
 				//tmp = getValue(id);
@@ -388,17 +397,8 @@ var pise_tool = (function() {
 		var para = false;
 		var typeAttr;
 
-
-		switch (paramType) {
-			case 'Integer':
-				typeAttr = 'type="text" ';
-				break;
-			case 'Float':
-				typeAttr = 'type="text" ';
-				break;
-			case 'String':
-				typeAttr = 'type="text" ';
-				break;
+		switch (paramType)
+		{
 			case 'Switch':
 				typeAttr = 'type="checkbox" ';
 				break;
@@ -418,7 +418,7 @@ var pise_tool = (function() {
 			case 'Paragraph':
 				para = true;
 				break;
-			default: 
+			default: // Integer, Float, String
 				typeAttr = 'type="text" ';
 		}
 		//determine element values
@@ -436,7 +436,6 @@ var pise_tool = (function() {
 			text = "<h4 id='" + elementID + "-lab'>" + options.label + "</h4>";
 		} else
 		{
-
 			if (vlist) //generate select
 			{
 				//select element
@@ -459,9 +458,9 @@ var pise_tool = (function() {
 				eString = "<input " + name + id + typeAttr +  " maxlength='600'><br>";
 			}
 			text = "<label id='" + elementID + "-lab'>" + options.label + "</label>";
-			
 		}
-		$(options.container).append("<div class='form-group'>" + text + eString + "</div>");
+		//insert element
+		options.container.append("<div class='form-group'>" + text + eString + "</div>");
 		// Store pise datatype with each element.
 		var element = $('#' + elementID);
 		element.data('pisetype', paramType);
@@ -485,12 +484,13 @@ var pise_tool = (function() {
 			}
 		}
 		// insert help section
-		insertComment(element.prev('label'),
-		{
-			label: options.label,
-			comment: options.comment,
-			comContainer: options.comContainer
-		});
+		insertComment(
+			element.prev('label'),
+			{
+				label: options.label,
+				comment: options.comment,
+				comContainer: options.comContainer
+			});
 
 		return element;
 	}
@@ -561,8 +561,9 @@ var pise_tool = (function() {
 		// iterate over all form elements that have preconds and enable/disable them
 		var elementsWithPreconds = $('*').filter(function() { return $(this).data('precond') !== undefined; });
 		$.each(elementsWithPreconds, function() {
-			var precondStr = $(this).data('precond');
-			disable( $(this).attr('id'),  !resolveCode($(this), precondStr));
+			var $this = $(this);
+			var precondStr = $this.data('precond');
+			disable( $this,  !resolveCode($this, precondStr));
 		});
 	}
 
@@ -571,18 +572,18 @@ var pise_tool = (function() {
 		- parameter is name of parameter (i.e. element's 'id' attribute)
 		- flag is a boolean
 	*/
-	function disable(parameter, flag)
+	function disable($element, flag)
 	{
-		var element = $('#' + parameter);
-		if (element)
+		//var element = $('#' + parameter);
+		if ($element)
 		{
-			element.prop('disabled', flag); 
+			$element.prop('disabled', flag); 
 			if (flag)
 			{
-				element.parent('.form-group').addClass('disabled');
+				$element.parent('.form-group').addClass('disabled');
 			} else
 			{
-				element.parent('.form-group').removeClass('disabled');
+				$element.parent('.form-group').removeClass('disabled');
 			}
 		}
 	}
@@ -590,15 +591,14 @@ var pise_tool = (function() {
 	/*
 		- parameter is name of parameter (i.e. element's 'id' attribute)
 	*/
-	function isDisabled(parameter)
+	function isDisabled($element)
 	{
-		var element = $('#' + parameter);
-		if (element == null)
+		//var element = $('#' + parameter);
+		if ($element == null)
 		{
 			return true;
 		}
-		var isDisabled = element.prop('disabled');
-		return isDisabled;
+		return $element.prop('disabled');
 	}
 
 	/*
@@ -620,13 +620,13 @@ var pise_tool = (function() {
 		// For checkbox type (i.e. a pise Switch) always return true or false
 		if (element.prop('type') == 'checkbox')
 		{
-			if (isDisabled(parameter))
+			if (isDisabled(element))
 				return false;
 			return element.is(":checked");
 		}
 
 		// For all other types, if disabled, return empty string
-		if (isDisabled(parameter))
+		if (isDisabled(element))
 		{
 			return "";
 		}
