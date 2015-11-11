@@ -4,7 +4,25 @@ body {
 }
 
 a {
-  color: #00B7FF;
+	color: #00B7FF; 
+	padding:10px;
+}
+
+a.disabled
+{
+	color: #999999;
+	padding:10px;
+}
+
+span.filename
+{
+	padding:10px;
+	font-size: smaller;
+}
+
+div.form-group
+{
+	padding: 5px;
 }
 
 .container-header {

@@ -220,25 +220,39 @@ var pise_tool = (function() {
 			if (!error) 
 			{
 				/*
-					print all elements/values.  Includes submit button and input source element, which don't have id attributes. 
-					I'm just doing this to compare it with what serializeArray returns.
+					Build list of vparams and iparams that the rest api will need.
 				*/
-				console.log("All elements");
+				var vparams = {};
+				var iparams = {};
 				$(container).find('input, select').each(function()
 				{
-					console.log("id:" + $(this).attr('id') + ", name:" + $(this).attr('name') + ", value=" + $(this).val() + 
-						($(this).prop('disabled') ? ", disabled" : ""));
+					var id = $(this).attr('id');
+					if (!isDisabled(id)) 
+					{
+						var value = $(this).val();
+						
+						if (value == null || value == '')
+						{
+							return;
+						}
+						var type = $(this).data('pisetype');
+						if (type == 'InFile' || type == 'Sequence')
+						{
+							iparams[id] = value;
+						} else
+						{
+							vparams[id] = value;
+						}
+					}
 				});
 
 				/*
-					- serializeArray apparently omits select elements of type="file"!
-					- It also omits anything that is disabled or has empty string as the value, as it would for a form submission.
-					- The value, of a file control, is just the filename, no path info. Can we get the path info?
-					- Only checked checkboxes are sent. TODO: We need to send value of all checkboxes that aren't disabled.
-						In the cipres portal we use struts and struts has code to work around this so that the action
-						that the form is posted to gets a boolean value for each checkbox.
+					Pass the parameter dictionaries as json strings because this callback
+					may actually be a *java* function in a javafx application, like
+					desktop-cipres, and json seems to be a fairly easy way to exchange
+					data between javascript and java.
 				*/
-				callback($(this).serializeArray());
+				callback(JSON.stringify(iparams), JSON.stringify(vparams));
 			}
 		});
 	};
@@ -455,7 +469,18 @@ var pise_tool = (function() {
 				eString += "</select><br>";
 			} else //generate input
 			{
-				eString = "<input " + name + id + typeAttr +  " maxlength='600'><br>";
+				//###
+				if (fileChooserType == 'desktop' && (paramType == 'InFile' || paramType == 'Sequence'))
+				{
+					eString = '<a href="" id="link_' + elementID +'" >Select file </a><span class="filename" id="' + 'display_' + elementID + '"' +   '></span>';
+
+					//eString += "<input " + name + id + "style='display:none"      + "><br>";
+					//eString += "<input " + name + id +  "><br>";
+					eString += "<input " + name + id +  " type='hidden'><br>";
+				} else
+				{
+					eString = "<input " + name + id + typeAttr + " maxlength='600'><br>";
+				}
 			}
 			text = "<label id='" + elementID + "-lab'>" + options.label + "</label>";
 		}
@@ -468,10 +493,7 @@ var pise_tool = (function() {
 		// When any element changes, call resolveParameters
 		element.change({source: elementID}, resolveParameters);
 
-		//console.log("Getting default value of " + elementID);
 		var defaultValue = getDefaultValue($node);
-		//console.log("Default value is: " + defaultValue);
-
 		// Set default value
 		if (defaultValue != null)
 		{
@@ -483,6 +505,7 @@ var pise_tool = (function() {
 				element.val(defaultValue);
 			}
 		}
+
 		// insert help section
 		insertComment(
 			element.prev('label'),
@@ -491,6 +514,21 @@ var pise_tool = (function() {
 				comment: options.comment,
 				comContainer: options.comContainer
 			});
+
+		$('#link_' + elementID).click(function(){
+			var id = this.id.replace(/^link_/, '');
+			if ($('#link_' + id).hasClass('disabled') == true)
+			{
+				return false;
+			}
+			var myval = theFileChooser();
+			if (myval != null)
+			{
+				 $('#display_' +id).text(myval);
+				 $('#' + id).val(myval);
+			}
+			return false;
+		});
 
 		return element;
 	}
@@ -574,7 +612,6 @@ var pise_tool = (function() {
 	*/
 	function disable($element, flag)
 	{
-		//var element = $('#' + parameter);
 		if ($element)
 		{
 			$element.prop('disabled', flag); 
@@ -585,6 +622,11 @@ var pise_tool = (function() {
 			{
 				$element.parent('.form-group').removeClass('disabled');
 			}
+
+			if (fileChooserType == 'desktop')
+			{
+				$('#link_' + $element.attr('id')).toggleClass('disabled', flag);
+			}
 		}
 	}
 
@@ -593,8 +635,9 @@ var pise_tool = (function() {
 	*/
 	function isDisabled($element)
 	{
-		//var element = $('#' + parameter);
-		if ($element == null)
+		// JQuery always returns a jquery object, even when the id (or other select) isn't found.
+		// It's length will be zero iff not found.
+		if ($element.length == 0)
 		{
 			return true;
 		}
@@ -613,7 +656,7 @@ var pise_tool = (function() {
 	{
 		var element = $('#' + parameter);
 
-		if (element == null)
+		if (element.length == 0)
 		{
 			return null;
 		}
