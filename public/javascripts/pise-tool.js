@@ -2,8 +2,6 @@
 	TODO: 
 		- How does the portal initialze Lists and Excls that don't have vdefs?
 
-		- Set maxlength for input fields.  In portal it's 600.
-
 		- Add help text (as hover?  also as a link.)  An element's label should be an href link to 
 		its help text and the help text should have a link back to the element. 
 
@@ -19,26 +17,6 @@
 		- In insertElement() I corrected handling of "List" pise type.  It should be a multiple select
 		control.  It is correct now but looks terrible.  Fix appearance?  To see it in action, choose
 		tool = muscle and scroll down to "Diagonal Functions".
-
-		- Paragraphs:
-			- Can paragraphs have preconds that affect all params in the paragraph?
-			- I don't think we need simple and advanced divs within paragraphs.  I think the only issimple we
-			need to pay attention to would be one on the top level parameter enclosing the parapgraph.  In other
-			words, the whole paragraph is either in the simple or advanced section.
-
-		- Excl type: when there are less than 4 choices (check on this, it may be less than 3) it is done
-		as a radio button in cipres.  For example, see probalign "Sequence Type" in the portal.  If we
-		do the same here, note that special handling may be required to disable/enable and get the value
-		of radio button controls.
-
-		- I want to set an attribute on the whole form-group that includes the label and the
-		input/select element, when the element is disabled.  That way we can do different css styling 
-		(in a stylesheet) for enabled/disabled field groups.  In particular I'd like to try changing the 
-		label text to light gray when disabled.  It's too hard for me to see which fields are disabled.
-
-		- Simple and Advanced headers should collapse and expand their sections.  Initially Simple is expanded 
-		and Advanced is collapsed.  Same as in the portal.
-
 
 	Cheatsheet for Terri:
 		- $ is an alias for jQuery in many contexts.  For example $(container) means jQuery(container).
@@ -151,15 +129,17 @@ var pise_tool = (function() {
 		});
 
 		// Define what happens when form is submitted.
-		$(container).unbind().submit(function(e) 
+		$container.unbind().submit(function(e) 
 		{
 			e.preventDefault();
 			var error = false;
+			var messages = [];
+			var invalidElems = [];
 			/* 
 				Validate datatype for 'Integer' and 'Float' parameters.  This is why we have data('pisetype') stored
 				with each input element.  
 			*/
-			$(container).find('input').each(function()
+			$container.find('input').each(function()
 			{
 				var type = $(this).data('pisetype');
 				var id = $(this).attr('id');
@@ -170,7 +150,9 @@ var pise_tool = (function() {
 					if ( value && ! /^(0|[1-9]\d*)$/.test(value) )
 					{
 						console.log("field with id=" + id + " is not an integer");
-						alert(id + " must be a positive integer.");
+						//alert(id + " must be a positive integer.");
+						messages.push(id + " must be a positive integer.");
+						invalidElems.push(id);
 						error = true;
 						//return false;
 					}
@@ -180,7 +162,9 @@ var pise_tool = (function() {
 					if ( value && ! /^\s*(\+|-)?((\d+(\.\d+)?)|(\.\d+))\s*$/.test(value) )
 					{
 						console.log("field with id=" + id + " is not float");
-						alert(id + " must be a decimal number.");
+						//alert(id + " must be a decimal number.");
+						messages.push(id + " must be a decimal number.");
+						invalidElems.push(id);
 						error = true;
 						//return false;
 					}
@@ -189,11 +173,14 @@ var pise_tool = (function() {
 			});
 
 			// iterate over all form elements that have controls 
-			var elementsWithCtrls= $('*').filter(function() { return $(this).data('ctrls') !== undefined; });
-			$.each(elementsWithCtrls, function() 
+			$('*').filter(function()
+			{
+				return $(this).data('ctrls') !== undefined;
+			})
+			.each(function() 
 			{
 				var $this = $(this);
-				if (!isDisabled($this))
+				if (!isDisabled($this) && $.inArray($this.attr('id'), invalidElems) < 0)
 				{
 					var ctrls = $this.data('ctrls');
 					var i;
@@ -204,20 +191,54 @@ var pise_tool = (function() {
 						if (resolveCode($this, code))
 						{
 							console.log(message);
-							alert(message);
+							//alert(message);
+							messages.push(message);
+							invalidElems.push($this.attr('id'));
 							error = true;
+							break; //one error per field
 							//return false;
 						}
 					}
 				}
 			});
 
+			//validate elements with ismandatory fields
+			$('*').filter(function()
+			{
+				return $(this).data('ismandatory');
+			})
+			.each(function()
+			{
+				var $this = $(this);
+				var precond = $this.data('precond');
+				if (!precond || precond && resolveCode($this, precond))
+				{
+					if (($this.val() == null || $this.val() == '') &&
+						$.inArray($this.attr('id'), invalidElems) < 0)
+					{
+						messages.push("field with id=" + $this.attr('id') + " must have a value");	
+						invalidElems.push($this.attr('id'));
+						error = true;
+					}
+				}
+			});
+
+			if (error)
+			{
+				var mString = "There was an error with your submission:\n\n";
+				for (var i = 0; i < messages.length; i++)
+				{
+					mString += "\u2022 " +  messages[i] + "\n";
+ 				}
+ 				alert(mString);
+			}
+
 			/*
 				execute callback if no errors.  Ideally I think we'd collect and report all errors at once, though only 
 				one error per each field.  For instance if runtime="foo", you wouldn't want to report 
 				"runtime must be a number" and "runtime must be > .1"
 			*/
-			if (!error) 
+			else
 			{
 				/*
 					Build list of vparams and iparams that the rest api will need.
@@ -226,9 +247,9 @@ var pise_tool = (function() {
 				var iparams = {};
 				$(container).find('input, select').each(function()
 				{
-					var id = $(this).attr('id');
-					if (!isDisabled(id)) 
+					if (!isDisabled($(this)))
 					{
+						var id = $(this).attr('id');
 						var value = $(this).val();
 						
 						if (value == null || value == '')
@@ -490,6 +511,8 @@ var pise_tool = (function() {
 		var element = $('#' + elementID);
 		element.data('pisetype', paramType);
 
+		if ($node.attr('ismandatory') == 1)
+			element.data('ismandatory', true)
 		// When any element changes, call resolveParameters
 		element.change({source: elementID}, resolveParameters);
 
