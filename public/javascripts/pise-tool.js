@@ -1,18 +1,8 @@
 /*
 	TODO: 
-		- How does the portal initialze Lists and Excls that don't have vdefs?
-
-		- Add help text (as hover?  also as a link.)  An element's label should be an href link to 
-		its help text and the help text should have a link back to the element. 
 
 		- Validation on submit:
-			- validate that required fields are all present and not disabled.
 			- need to validate pise min/max when they appear for Integer and Float types.
-			- should we find and report all errors at once, rather than one at a time? 
-			- Or if reporting a single error, return focus to the element that caused the error.
-
-		- "Submitting" the form.  See comments at serialzeArray().  It isn't exactly what we
-		need to do.
 
 		- In insertElement() I corrected handling of "List" pise type.  It should be a multiple select
 		control.  It is correct now but looks terrible.  Fix appearance?  To see it in action, choose
@@ -29,263 +19,276 @@
 		- all jquery objects (form fields, divs, etc) have a data(name, value) method that 
 		lets you associate arbitrary data with the object.  Attributes in the html of the form "data-X=y"
 		can be retrieved with .data('X').
-		- jQuery supports "fluent" or "chained" method calls where most methods return
-		the object they were called on.
 		- Can't use continue and break in JQuery each loop.  You need to return true (continue) or false (break)
 		from the function instead.
 		- empty string is false.
 		- The css id of each element in the form is the same as the name of the corresponding pise parameter.
 */
+
+
 var pise_tool = (function() {
-	var toolObj = {};
-	//parameter filter
+	var vparams = {};
+	var iparams = {};
+	var tooldID = "";
+	var theCallback;
+	var theFileChooserType;
+	var theFileChooser;
+
 	var paramFilter = "parameter:not([ishidden='1']):not([type='Results']):not([type='OutFile'])";
 
-	/*
-		tool-rendering function
-		url: pise url of tool
-		container: css selector (string) for html container that is to contain the form
-		callback: function to be executed with 
-	*/
-	toolObj.render_tool = function(url, container, callback) 
-	{	
-		//create form element
-		$(container)
-			.empty()
-			.append("<form></form>")
-			.append("<dl class='comment'></dl>")
-			//add simple and advanced containers to form
-			.children('form')
-			.append("<div class='simple'></div>" +
-					"<div class='advanced'></div>");
-
-		// Set container to css selector for the form 
-		var $container = $(container + " form");
-
-		// selectors for the simple and advanced divs.  E.g. $(containers.simContainer) is the simple container.
-		var containers =
+	var toolObj = 
+	{
+		init : function(callback, fileChooserType, fileChooser)
 		{
-			simContainer: $(container + " form > div.simple"),
-			advContainer: $(container + " form > div.advanced"),
-			comContainer: $(container + " > dl.comment")
-		};
-
-		//retrieve pisexml file.  Callback fn creates form elements from pisexml parameters.
-		$
-			.ajax({ url: url, type: 'GET', dataType: 'xml' })
-			.then(function(data) 
+			if (callback)
 			{
-				//iterate through parameters
-				$(data)
-					.find('pise > parameters > ' + paramFilter)
-					.each(function(index, value) 
-					{
-						var $value = $(value);
-						if($value.attr('type') == 'Paragraph') 
-						{
-							insertToForm(value, containers, true);
-							var id = $value.children('paragraph').children('name').text();
-							var paraContainer = $("div#" + id);
-
-							$value
-								.find('paragraph > parameters > ' + paramFilter)
-								.each(function(index, value) 
-								{
-									insertToForm(
-										value, 
-										{
-											simContainer: paraContainer,
-											advContainer: paraContainer,
-											comContainer: containers.comContainer
-										}, 
-										false);
-								});
-						} else
-						{
-							insertToForm(value, containers, false);
-						}
-				});
-			//append submit button
-			$container.append('<input type="submit" value="submit">');
-
-			// Enable/disable elements based on their preconds.
-			resolveParameters(null);
-
-			//add collapse headings to simple and advanced containers
-			$container.children("div.simple")
-				.before("<h2 class='container-header'>Simple Params</h2>")
-				.prev()
-				.click(function() { $(this).next().slideToggle() });
-			$container.children("div.advanced")
-				.before("<h2 class='container-header'>Advanced Params</h2>")
-				.prev()
-				.click(function() { $(this).next().slideToggle() })
-				.click();
-			$container.next('dl.comment')
-				.before("<h2 class='container-header'>Help</h2>")
-				.prev()
-				.click(function() { $(this).next().slideToggle() })
-				.click();
-		});
-
-		// Define what happens when form is submitted.
-		$container.unbind().submit(function(e) 
-		{
-			e.preventDefault();
-			var error = false;
-			var messages = [];
-			var invalidElems = [];
-			/* 
-				Validate datatype for 'Integer' and 'Float' parameters.  This is why we have data('pisetype') stored
-				with each input element.  
-			*/
-			$container.find('input').each(function()
+				theCallback = callback;
+			} else
 			{
-				var type = $(this).data('pisetype');
-				var id = $(this).attr('id');
-				var value = $(this).val();
-				//if (type && (type == 'Integer'))
-				if (type && (type == 'Integer'))
-				{
-					if ( value && ! /^(0|[1-9]\d*)$/.test(value) )
-					{
-						console.log("field with id=" + id + " is not an integer");
-						//alert(id + " must be a positive integer.");
-						messages.push(id + " must be a positive integer.");
-						invalidElems.push(id);
-						error = true;
-						//return false;
-					}
-						
-				} else if (type && (type == 'Float'))
-				{
-					if ( value && ! /^\s*(\+|-)?((\d+(\.\d+)?)|(\.\d+))\s*$/.test(value) )
-					{
-						console.log("field with id=" + id + " is not float");
-						//alert(id + " must be a decimal number.");
-						messages.push(id + " must be a decimal number.");
-						invalidElems.push(id);
-						error = true;
-						//return false;
-					}
-				} 
-				
-			});
-
-			// iterate over all form elements that have controls 
-			$('*').filter(function()
-			{
-				return $(this).data('ctrls') !== undefined;
-			})
-			.each(function() 
-			{
-				var $this = $(this);
-				if (!isDisabled($this) && $.inArray($this.attr('id'), invalidElems) < 0)
-				{
-					var ctrls = $this.data('ctrls');
-					var i;
-					for (i = 0; i < ctrls.length; i++)
-					{
-						var code = ctrls[i].code;
-						var message = ctrls[i].message;
-						if (resolveCode($this, code))
-						{
-							console.log(message);
-							//alert(message);
-							messages.push(message);
-							invalidElems.push($this.attr('id'));
-							error = true;
-							break; //one error per field
-							//return false;
-						}
-					}
-				}
-			});
-
-			//validate elements with ismandatory fields
-			$('*').filter(function()
-			{
-				return $(this).data('ismandatory');
-			})
-			.each(function()
-			{
-				var $this = $(this);
-				var precond = $this.data('precond');
-				if (!precond || precond && resolveCode($this, precond))
-				{
-					if (($this.val() == null || $this.val() == '') &&
-						$.inArray($this.attr('id'), invalidElems) < 0)
-					{
-						messages.push("field with id=" + $this.attr('id') + " must have a value");	
-						invalidElems.push($this.attr('id'));
-						error = true;
-					}
-				}
-			});
-
-			if (error)
-			{
-				var mString = "There was an error with your submission:\n\n";
-				for (var i = 0; i < messages.length; i++)
-				{
-					mString += "\u2022 " +  messages[i] + "\n";
- 				}
- 				alert(mString);
+				theCallback = toolObj.defaultCallback;
 			}
+			if (fileChooserType)
+			{ 
+				theFileChooserType = fileChooserType;
+			} else
+			{
+				theFileChooserType = "default";
+			}
+			if (fileChooser)
+			{
+				theFileChooser = fileChooser;
+			} else
+			{
+				theFileChooser = toolObj.defaultFileChooser;
+			}
+		},
+
+		chooseTool :  function(tool_url, tooldiv_id, form_id)
+		{
+			$.ajax({ url: tool_url, type: 'GET', dataType: 'xml' }).then(function(data)
+			{
+				var list = "<select id='toolselector'>";
+				$(data).find("tool").each(function(index, value) {
+					var $node = $(value);
+					var toolID = $node.find('toolId').text();
+					var pise = $node.find('piseUri').find('url').text();
+					list += "<option value='" + pise + "'" + "data-toolid='" + toolID + "'" + "'>" + toolID + "</option>";
+				});
+				list += "</select><br>";
+				$(tooldiv_id).append(list);
+
+				// If user supplies a form_id div we render the form when tool selection changes
+				var $form = $(form_id);
+				if ($form.length)
+				{
+					$("#toolselector").change(function() 
+					{
+						var toolID = $(this).find('option:selected').data('toolid');
+						pise_tool.render_tool(toolID, $(this).val(), form_id);
+					}); 
+				}
+			}); 
+		},
+
+		render_tool : function(toolID, url, form_id) 
+		{	
+			var $form = $(form_id);
+			if (! $form.length)
+			{
+				alert("form must have div with id:" + form_id);
+				return;
+			}
+			$form.empty();
+			$form.append("<div class='form_fields'>");
+			$form.append("<div class='simple'></div>");
+			$form.append("<div class='advanced'></div>");
+			$form.append('<input type="submit" value="View">');
+			$form.append("</div>");
+			$form.append("<dl class='comment'></dl>")
+
+			// selectors for the simple and advanced divs.  E.g. $(containers.simContainer) is the simple container.
+			var containers =
+			{
+				simContainer: $(form_id + " > div.simple"),
+				advContainer: $(form_id  + " > div.advanced"),
+				comContainer: $(form_id + " > dl.comment")
+			};
+			//append hidden fields that caller may want if he actually POSTS the form 
+			$form.append('<input type="hidden" name="toolidjson" id="toolidjson">');
+			$form.append('<input type="hidden" name="iparamsjson" id="iparamsjson">');
+			$form.append('<input type="hidden" name="vparamsjson" id="vparamsjson">');
+
+			//retrieve pisexml file.  Callback fn creates form elements from pisexml parameters.
+			$.ajax({ url: url, type: 'GET', dataType: 'xml' }).then(function(data) 
+			{
+					//iterate through parameters
+					$(data).find('pise > parameters > ' + paramFilter).each(function(index, value) 
+					{
+							var $value = $(value);
+							if($value.attr('type') == 'Paragraph') 
+							{
+								insertToForm(value, containers, true);
+								var id = $value.children('paragraph').children('name').text();
+								var paraContainer = $("div#" + id);
+
+								$value
+									.find('paragraph > parameters > ' + paramFilter)
+									.each(function(index, value) 
+									{
+										insertToForm(
+											value, 
+											{
+												simContainer: paraContainer,
+												advContainer: paraContainer,
+												comContainer: containers.comContainer
+											}, 
+											false);
+									});
+							} else
+							{
+								insertToForm(value, containers, false);
+							}
+					});
+
+				// Enable/disable elements based on their preconds.
+				resolveParameters(null);
+
+				//add collapse headings to simple and advanced containers
+				/*
+					This seems to be assuming there may be multiple "simple, advanced, .." sections.
+					before() - Before each we insert a header
+					prev() - is this needed to return the just inserted header?
+					click() - add an on click fn that expands/collapses the following div, i.e the "div.simple, div.advanced, etc" 
+					TODO: add a .click() to any sections you want to start out hidden.
+				*/
+				$form.children("div.simple")
+					.before("<h2 class='container-header'>Simple Parameters</h2>")
+					.prev()
+					.click(function() { $(this).next().slideToggle() });
+				$form.children("div.advanced")
+					.before("<h2 class='container-header'>Advanced Parameters</h2>")
+					.prev()
+					.click(function() { $(this).next().slideToggle() });
+				$form.children('dl.comment')
+					.before("<h2 class='container-header'>Help</h2>")
+					.prev()
+					.click(function() { $(this).next().slideToggle() });
+				// If no advanced parameters, hide the whole section
+				if (! $(containers.advContainer).find('input', 'select').length)
+				{
+					// hide the header and the div that would have controls. 
+					$(containers.advContainer).prev().hide();
+					$(containers.advContainer).hide();
+				}
+			});
 
 			/*
-				execute callback if no errors.  Ideally I think we'd collect and report all errors at once, though only 
-				one error per each field.  For instance if runtime="foo", you wouldn't want to report 
-				"runtime must be a number" and "runtime must be > .1"
+				Validate the form and if errors display an alert() and return false (so that form isn't submitted).
+				If no validation errors, this fn calls the supplied callback method and returns whatever
+				it returns.  
 			*/
-			else
+			$form.on('submit', function() 
 			{
-				/*
-					Build list of vparams and iparams that the rest api will need.
-				*/
-				var vparams = {};
-				var iparams = {};
-				$(container).find('input, select').each(function()
+				console.log("In submit handler");
+				if (validate($form) == false)
 				{
-					if (!isDisabled($(this)))
+					return false;
+				}
+
+				// Build list of vparams and iparams that the rest api will need.
+				toolID = toolID;
+				$form.find('input, select').each(function()
+				{
+					var type = $(this).data('pisetype');
+					if (type && !isDisabled($(this)))
 					{
 						var id = $(this).attr('id');
 						var value = $(this).val();
 						
-						if (value == null || value == '')
+						if (!(value === null || value === ''))
 						{
-							return;
-						}
-						var type = $(this).data('pisetype');
-						if (type == 'InFile' || type == 'Sequence')
-						{
-							iparams[id] = value;
-						} else
-						{
-							vparams[id] = value;
+							if (type == 'InFile' || type == 'Sequence')
+							{
+								iparams[id] = value;
+							} else if (type == 'Switch')  
+							{
+								vparams[id] = (value == 'on' ? '1' : '0');
+							} else
+							{
+								vparams[id] = value;
+							}
 						}
 					}
 				});
+				var istr = JSON.stringify(iparams);
+				var vstr = JSON.stringify(vparams);
+				$("#toolid").val(toolID);
+				$("#iparamsjson").val(istr);
+				$("#vparamsjson").val(vstr);
+				return theCallback(toolID, istr, vstr);
+			});
+		}, // end renderTool()
 
-				/*
-					Pass the parameter dictionaries as json strings because this callback
-					may actually be a *java* function in a javafx application, like
-					desktop-cipres, and json seems to be a fairly easy way to exchange
-					data between javascript and java.
-				*/
-				callback(JSON.stringify(iparams), JSON.stringify(vparams));
+		defaultCallback :   function(toolID, i, v)
+		{
+			var iparams = $.parseJSON(i);
+			var vparams = $.parseJSON(v);
+
+			console.log("This is the default form submit callback fn. Form submitted for tool: " + toolID)
+			console.log("IPARAMS:");
+			var key;
+			for (key in iparams)
+			{
+				if (iparams.hasOwnProperty(key))
+				{
+					console.log(key + "=" + iparams[key]);
+				}
 			}
-		});
-	};
-	//end of toolObj.render_tool
+			console.log("VPARAMS:");
+			for (key in vparams)
+			{
+				if (vparams.hasOwnProperty(key))
+				{
+					console.log(key + "=" + vparams[key]);
+				}
+			}
+			return false;
+		},
+
+		ajaxPostCallback:  function(toolID, istr, vstr)
+		{
+			var pop = window.open("", "popupWindow", "width=800,height=600,scrollbars=yes");
+			pop.focus();
+			var request = $.ajax({
+				type: 'POST',
+				data:	'toolID=' + toolID + "&" + 	'iparams=' + istr + "&" + 'vparams=' + vstr,
+				async: false 
+			});
+			request.done(function(html) {
+				pop.document.write(html);
+				pop.document.close();
+			});
+			request.fail(function(jqXHR, text, et) { alert(text); });
+			return false;
+		},
+
+		defaultFileChooser : function()
+		{
+			console.log("This is the defaultFileChooser fn, returning foo.txt");
+			return "foo.txt";
+		}
+	}; // end toolObj
 
 	/*
 		inserts individual parameters to form
 		value: xml parameter
 		paragraph: boolean - is element is a paragraph parameter ? 
 
-		if parameter  has precond, adds 'precond' to elements data
-		if parameter has ctrls, adds 'ctrls' to elements data 
+		Store these data attributes with the element:
+		'precond'       : if pise parameter has a precond
+		'ctrls'         : if pise parameter has ctrls 
+		'label'         :  the prompt text
+		'ismandatory    : with a value of true, if pise parameter has isMandatory=1
 	*/
 	function insertToForm(value, containers, paragraph) 
 	{
@@ -326,6 +329,7 @@ var pise_tool = (function() {
 				- 'precond'
 				- 'ctrls' 
 				- 'pisetype' (added by insertElement)
+				- 'label'
 		*/
 		// There is only one precond element per parameter, at most
 		var $precond = $node.children('attributes').children('precond');
@@ -350,6 +354,7 @@ var pise_tool = (function() {
 			});
 			element.data('ctrls', ctrl);
 		}
+		element.data('label', label);
 	}
 
 	//convert perl code snippet to javascript
@@ -491,7 +496,7 @@ var pise_tool = (function() {
 			} else //generate input
 			{
 				//###
-				if (fileChooserType == 'desktop' && (paramType == 'InFile' || paramType == 'Sequence'))
+				if (theFileChooserType == 'desktop' && (paramType == 'InFile' || paramType == 'Sequence'))
 				{
 					eString = '<a href="" id="link_' + elementID +'" >Select file </a><span class="filename" id="' + 'display_' + elementID + '"' +   '></span>';
 
@@ -505,19 +510,21 @@ var pise_tool = (function() {
 			}
 			text = "<label id='" + elementID + "-lab'>" + options.label + "</label>";
 		}
-		//insert element
+		//append element to form
 		options.container.append("<div class='form-group'>" + text + eString + "</div>");
-		// Store pise datatype with each element.
+
+		// Store pise datatype with the element.
 		var element = $('#' + elementID);
 		element.data('pisetype', paramType);
 
+		// Store "ismandatory" attribute with the element
 		if ($node.attr('ismandatory') == 1)
 			element.data('ismandatory', true)
+
 		// When any element changes, call resolveParameters
 		element.change({source: elementID}, resolveParameters);
 
 		var defaultValue = getDefaultValue($node);
-		// Set default value
 		if (defaultValue != null)
 		{
 			if (paramType == "Switch")
@@ -630,7 +637,7 @@ var pise_tool = (function() {
 
 	/*
 		Disable or enable a form element
-		- parameter is name of parameter (i.e. element's 'id' attribute)
+		- element is the form input or select control.
 		- flag is a boolean
 	*/
 	function disable($element, flag)
@@ -646,7 +653,7 @@ var pise_tool = (function() {
 				$element.parent('.form-group').removeClass('disabled');
 			}
 
-			if (fileChooserType == 'desktop')
+			if (theFileChooserType == 'desktop')
 			{
 				$('#link_' + $element.attr('id')).toggleClass('disabled', flag);
 			}
@@ -654,7 +661,7 @@ var pise_tool = (function() {
 	}
 
 	/*
-		- parameter is name of parameter (i.e. element's 'id' attribute)
+		- element is the html input or select element.
 	*/
 	function isDisabled($element)
 	{
@@ -673,7 +680,14 @@ var pise_tool = (function() {
 		- for multiple select list (pise type "Excl") this only returns
 		the first value in the list.  In cipres portal, that works ok where we 
 		call getValue() but we aren't using getValue to submit the form elements,
-		only to verify preconds and controls.
+		only to verify preconds, controls and ismandatory.
+
+		Returns:
+		- null if there is no input element corresponding the pise parameter.  Shouldn't happen.
+		- 0 or 1 for type Switch
+		- a string, possibly empty.  
+		- empty string if the parameter is disabled.
+
 	*/
 	function getValue(parameter)
 	{
@@ -687,8 +701,10 @@ var pise_tool = (function() {
 		if (element.prop('type') == 'checkbox')
 		{
 			if (isDisabled(element))
-				return false;
-			return element.is(":checked");
+				return '';
+
+			var v = element.is(":checked");
+			return v ? 1 : 0;
 		}
 
 		// For all other types, if disabled, return empty string
@@ -708,6 +724,104 @@ var pise_tool = (function() {
 		}
 		var retval = element.val();
 		return retval;
+	}	
+
+	function validate($container)
+	{
+		var error = false;
+		var messages = [];
+		var invalidElems = [];
+		// Validate datatype of Integer and Float parameters.
+		$container.find('input').each(function()
+		{
+			var type = $(this).data('pisetype');
+			var id = $(this).attr('id');
+			var value = $(this).val();
+			var label = $(this).data('label');
+			//if (type && (type == 'Integer'))
+			if (type && (type == 'Integer'))
+			{
+				if ( value && ! /^(0|[1-9]\d*)$/.test(value) )
+				{
+					console.log(label + " : is not an integer");
+					messages.push(label + " : must be a positive integer.");
+					invalidElems.push(id);
+					error = true;
+				}
+					
+			} else if (type && (type == 'Float'))
+			{
+				if ( value && ! /^\s*(\+|-)?((\d+(\.\d+)?)|(\.\d+))\s*$/.test(value) )
+				{
+					console.log(label +  " : is not float");
+					messages.push(label + " :  must be a decimal number.");
+					invalidElems.push(id);
+					error = true;
+				}
+			} 
+		});
+
+		// iterate over all form elements that have controls 
+		$('*').filter(function()
+		{
+			return $(this).data('ctrls') !== undefined;
+		})
+		.each(function() 
+		{
+			var $this = $(this);
+			var label = $this.data('label');
+			if (!isDisabled($this) &&  $.inArray($this.attr('id'), invalidElems) < 0)
+			{
+				var ctrls = $this.data('ctrls');
+				var i;
+				for (i = 0; i < ctrls.length; i++)
+				{
+					var code = ctrls[i].code;
+					var message = ctrls[i].message;
+					if (resolveCode($this, code))
+					{
+						console.log(message);
+						messages.push(message);
+						invalidElems.push($this.attr('id'));
+						error = true;
+						break; // report no more than one error per field
+					}
+				}
+			}
+		});
+
+		//validate elements with ismandatory fields
+		$('*').filter(function()
+		{
+			return $(this).data('ismandatory');
+		})
+		.each(function()
+		{
+			var $this = $(this);
+			var id = $this.attr('id');
+			var label = $this.data('label');
+			if (!isDisabled($this) &&  $.inArray(id, invalidElems) < 0)
+			{
+				var value = getValue(id);
+				if (value === null || value === '')
+				{
+					messages.push(label + " :  must have a value");	
+					invalidElems.push($this.attr('id'));
+					error = true;
+				}
+			}
+		});
+		if (error)
+		{
+			var mString = "There was an error with your submission:\n\n";
+			for (var i = 0; i < messages.length; i++)
+			{
+				mString += "\u2022 " +  messages[i] + "\n";
+			}
+			alert(mString);
+			return false;
+		}
+		return true;
 	}
 
 	return toolObj;

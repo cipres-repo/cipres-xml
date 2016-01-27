@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- This page is for use with desktop-cipres -->
 <html>
   <head>
     <title>Cipres Tool Configuration</title>
@@ -7,16 +8,23 @@
   <body>
 
 	<h1>Cipres Tool Configuration</h1>
-	<p>Welcome to Cipres Tool Configuration</p>
+	<p>Welcome to Cipres Tool Configuration. Choose a tool and configure it's settings, then press View.
+	The values you selected will be displayed on stdout.  The output comes from the java code
+	in desktop-cipres, demonstrating how this html/javascript gui can post data to a desktop java app.
+	</p>
 
 	<h3>Select a tool.</h3>
-	<div class="tools"></div>
-	<h3>Tool form</h3>
-	<div class="container"></div>
+	<div class="cipres_tools" id="cipres_tools"></div>
+	<div class="container">
+		<form id="cipres_form"></form>
+	</div>
 
     <script src="bower_components/jquery/dist/jquery.min.js"></script>
     <script src="public/javascripts/pise-tool.js"></script>
+	<!--
+		Let desktop cipres configure and call pise_tool methods	
     <script src="public/javascripts/tool-dropdown.js"></script>
+	-->
 
   </body>
 </html>
