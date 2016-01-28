@@ -67,7 +67,7 @@ var pise_tool = (function() {
 		{
 			$.ajax({ url: tool_url, type: 'GET', dataType: 'xml' }).then(function(data)
 			{
-				var list = "<select id='toolselector'>";
+				var list = "<select id='toolselector'> <option value=''>Select a Tool</option>";
 				$(data).find("tool").each(function(index, value) {
 					var $node = $(value);
 					var toolID = $node.find('toolId').text();
@@ -99,6 +99,10 @@ var pise_tool = (function() {
 				return;
 			}
 			$form.empty();
+			if (!toolID)
+			{
+				return;
+			}
 			$form.append("<div class='form_fields'>");
 			$form.append("<div class='simple'></div>");
 			$form.append("<div class='advanced'></div>");
@@ -124,43 +128,27 @@ var pise_tool = (function() {
 					//iterate through parameters
 					$(data).find('pise > parameters > ' + paramFilter).each(function(index, value) 
 					{
-							var $value = $(value);
-							if($value.attr('type') == 'Paragraph') 
-							{
-								insertToForm(value, containers, true);
-								var id = $value.children('paragraph').children('name').text();
-								var paraContainer = $("div#" + id);
+						var $value = $(value);
+						if($value.attr('type') == 'Paragraph') 
+						{
+							insertToForm(value, containers, true);
+							var id = $value.children('paragraph').children('name').text();
+							var paraContainer = $("div#" + id);
 
-								$value
-									.find('paragraph > parameters > ' + paramFilter)
-									.each(function(index, value) 
-									{
-										insertToForm(
-											value, 
-											{
-												simContainer: paraContainer,
-												advContainer: paraContainer,
-												comContainer: containers.comContainer
-											}, 
-											false);
-									});
-							} else
+							$value.find('paragraph > parameters > ' + paramFilter).each(function(index, value) 
 							{
-								insertToForm(value, containers, false);
-							}
+									insertToForm( value, { simContainer: paraContainer, advContainer: paraContainer, comContainer: containers.comContainer }, false);
+							});
+						} else
+						{
+							insertToForm(value, containers, false);
+						}
 					});
 
 				// Enable/disable elements based on their preconds.
 				resolveParameters(null);
 
 				//add collapse headings to simple and advanced containers
-				/*
-					This seems to be assuming there may be multiple "simple, advanced, .." sections.
-					before() - Before each we insert a header
-					prev() - is this needed to return the just inserted header?
-					click() - add an on click fn that expands/collapses the following div, i.e the "div.simple, div.advanced, etc" 
-					TODO: add a .click() to any sections you want to start out hidden.
-				*/
 				$form.children("div.simple")
 					.before("<h2 class='container-header'>Simple Parameters</h2>")
 					.prev()
@@ -186,16 +174,22 @@ var pise_tool = (function() {
 				Validate the form and if errors display an alert() and return false (so that form isn't submitted).
 				If no validation errors, this fn calls the supplied callback method and returns whatever
 				it returns.  
+				
+				Note that we need to unbind the handler before binding because this may be called multiple times, as different
+				tools are selected.  We call form.empty() when the tool changes to remove all the fields but 
+				that doesn't unbind handlers.
 			*/
-			$form.on('submit', function() 
+			$form.unbind('submit').on('submit', function() 
 			{
 				console.log("In submit handler");
 				if (validate($form) == false)
 				{
+					console.log("Submit handler returning false");
 					return false;
 				}
-
-				// Build list of vparams and iparams that the rest api will need.
+				// Build list of vparams and iparams that the rest api will need, after clearing previous values.
+				iparams = {};
+				vparams = {};
 				toolID = toolID;
 				$form.find('input, select').each(function()
 				{
@@ -212,7 +206,7 @@ var pise_tool = (function() {
 								iparams[id] = value;
 							} else if (type == 'Switch')  
 							{
-								vparams[id] = (value == 'on' ? '1' : '0');
+								vparams[id] = getValue(id) ? "1" : "0"
 							} else
 							{
 								vparams[id] = value;
@@ -262,7 +256,7 @@ var pise_tool = (function() {
 			var request = $.ajax({
 				type: 'POST',
 				data:	'toolID=' + toolID + "&" + 	'iparams=' + istr + "&" + 'vparams=' + vstr,
-				async: false 
+				async: true 
 			});
 			request.done(function(html) {
 				pop.document.write(html);
@@ -331,10 +325,18 @@ var pise_tool = (function() {
 				- 'pisetype' (added by insertElement)
 				- 'label'
 		*/
-		// There is only one precond element per parameter, at most
+		// There should only one precond element per parameter, at most, but some of the pise files
+		// had multiples (e.g. garli2_tgb, parameter inferinternalstateprobs_g.  Here we give a warning
+		// if we find multiples.  The pise file would need to be fixed.
 		var $precond = $node.children('attributes').children('precond');
 		if ($precond.length) 
 		{
+			//###
+			if ($precond.length > 1)
+			{
+				var elementID = $node.children('name').text();
+				alert("Element " + elementID + " has multiple preconds.  This is an internal error; the pise xml needs to be corrected.");
+			}
 			precondCode = $precond.children('code').text();
 			element.data('precond', sanitizeCode(precondCode));
 		}
@@ -347,10 +349,7 @@ var pise_tool = (function() {
 			$.each($controls, function(index, value) 
 			{
 				var $value = $(value);
-				ctrl.push({
-					message: $value.children('message').text(),
-					code: sanitizeCode($value.children('code').text())
-				});
+				ctrl.push({ message: $value.children('message').text(), code: sanitizeCode($value.children('code').text()) });
 			});
 			element.data('ctrls', ctrl);
 		}
@@ -380,15 +379,14 @@ var pise_tool = (function() {
 	*/
 	function resolveCode($element, code) 
 	{
-		//	replace variables in code 
+		var raw = code;
 		var variables = code.match(/\$\w+/g);
-		//console.log("resolveCode for element: " +  element.attr('id') + " , code: " + code);
 
 		$.each(variables, function(index, varname) 
 		{
 			var id;
 			var tmp;
-			if (varname == "value")
+			if (varname == "$value")
 			{
 				id  = $element.attr('id');
 
@@ -402,22 +400,20 @@ var pise_tool = (function() {
 			}
 			code = code.replace(varname, "getValue('" + id + "')");
 		});
-		//console.log("Modified code: " + code);
 		try
 		{
 			var retval = eval(code);
-			//console.log("Result is: " + retval);
 			return retval;
 		}
 		catch (e)
 		{
 			// This means the pise code snippet or our handling of it needs to be fixed.
-			console.log("Error evaluating: " + code);
+			console.log("Error evaluating code for parameter " + $element.attr('id') + ". Code = " + code);
+			console.log("Raw expression was: " + raw);
 			console.log(e.message);
 			alert("Error evaluating: " + code + ".  Error is: " + e.message);
 			return 0;
 		}
-		//return(eval(code));
 	}
 
 
@@ -495,13 +491,9 @@ var pise_tool = (function() {
 				eString += "</select><br>";
 			} else //generate input
 			{
-				//###
 				if (theFileChooserType == 'desktop' && (paramType == 'InFile' || paramType == 'Sequence'))
 				{
 					eString = '<a href="" id="link_' + elementID +'" >Select file </a><span class="filename" id="' + 'display_' + elementID + '"' +   '></span>';
-
-					//eString += "<input " + name + id + "style='display:none"      + "><br>";
-					//eString += "<input " + name + id +  "><br>";
 					eString += "<input " + name + id +  " type='hidden'><br>";
 				} else
 				{
@@ -537,15 +529,17 @@ var pise_tool = (function() {
 		}
 
 		// insert help section
-		insertComment(
-			element.prev('label'),
-			{
-				label: options.label,
-				comment: options.comment,
-				comContainer: options.comContainer
-			});
+		insertComment( element.prev('label'), { label: options.label, comment: options.comment, comContainer: options.comContainer });
 
-		$('#link_' + elementID).click(function(){
+		/*
+			Add an onClick handler for elements with ids that start with "link_".   We only have such
+			elements when fileChooserType = desktop.  In that case, instead of using an input element with type=file
+			we create an href with id like "link_paramName" and text "Select File".  We create a hidden input field
+			to store the selected value.  There's also a span, with id like display_paramName, to display the
+			selected value.
+		*/
+		$('#link_' + elementID).click(function()
+		{
 			var id = this.id.replace(/^link_/, '');
 			if ($('#link_' + id).hasClass('disabled') == true)
 			{
@@ -741,10 +735,10 @@ var pise_tool = (function() {
 			//if (type && (type == 'Integer'))
 			if (type && (type == 'Integer'))
 			{
-				if ( value && ! /^(0|[1-9]\d*)$/.test(value) )
+				if ( value && ! /^(\+|-)?(0|[1-9]\d*)$/.test(value) )
 				{
-					console.log(label + " : is not an integer");
-					messages.push(label + " : must be a positive integer.");
+					console.log("Type validation: " + label + " : is not an integer");
+					messages.push(label + " : must be an integer.");
 					invalidElems.push(id);
 					error = true;
 				}
@@ -753,7 +747,7 @@ var pise_tool = (function() {
 			{
 				if ( value && ! /^\s*(\+|-)?((\d+(\.\d+)?)|(\.\d+))\s*$/.test(value) )
 				{
-					console.log(label +  " : is not float");
+					console.log("Type validation: " + label +  " : is not float");
 					messages.push(label + " :  must be a decimal number.");
 					invalidElems.push(id);
 					error = true;
@@ -780,7 +774,7 @@ var pise_tool = (function() {
 					var message = ctrls[i].message;
 					if (resolveCode($this, code))
 					{
-						console.log(message);
+						console.log("Ctrl on field " + $this.attr('id') + ": " + message);
 						messages.push(message);
 						invalidElems.push($this.attr('id'));
 						error = true;
@@ -805,6 +799,7 @@ var pise_tool = (function() {
 				var value = getValue(id);
 				if (value === null || value === '')
 				{
+					console.log("Is mandatory eval fails for field " + id);
 					messages.push(label + " :  must have a value");	
 					invalidElems.push($this.attr('id'));
 					error = true;
