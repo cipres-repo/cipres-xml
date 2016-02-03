@@ -3,10 +3,15 @@
 <html>
   <head>
     <title>Cipres Tool Configuration</title>
-    <link rel='stylesheet' href='public/stylesheets/style.css' />
+    <link rel='stylesheet' href='public/stylesheets/cipres-xml.css' />
+    <link rel='stylesheet' href='/stylesheets/font-awesome-4.5.0/css/font-awesome.min.css' />
   </head>
   <body>
 
+	<div class="navbar">
+		<a href="jobs.html">My Jobs</a>&nbsp;|&nbsp<a href="profile.html">My Profile</a>&nbsp;|&nbsp<a href="index.html">Submit A Job</a>
+		<hr>
+	</div>
 	<h1>Cipres Tool Configuration</h1>
 	<p>Welcome to Cipres Tool Configuration. Choose a tool and configure it's settings, then press View.
 	The values you selected will be displayed on stdout.  The output comes from the java code
@@ -21,8 +26,9 @@
 
     <script src="bower_components/jquery/dist/jquery.min.js"></script>
     <script src="public/javascripts/pise-tool.js"></script>
+
 	<!--
-		Let desktop cipres configure and call pise_tool methods	
+	Need to let desktop cipres configure and call pise_tool methods	instead of using tool-dropdown.js
     <script src="public/javascripts/tool-dropdown.js"></script>
 	-->
 

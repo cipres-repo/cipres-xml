@@ -34,6 +34,17 @@ var pise_tool = (function() {
 	var theFileChooserType;
 	var theFileChooser;
 
+	var jsFileLocation = $('script[src*=pise-tool]').attr('src');  // the js file path
+	console.log("file:" + jsFileLocation);
+
+	jsFileLocation = jsFileLocation.replace('pise-tool.js', ''); // the directory
+	console.log("dir:" + jsFileLocation);
+
+	var imageRoot = jsFileLocation + '../images';
+	console.log("imageroot:" + imageRoot);
+	var infoImage = imageRoot + "/info.png";
+	console.log("infoImage:" + infoImage);
+
 	var paramFilter = "parameter:not([ishidden='1']):not([type='Results']):not([type='OutFile'])";
 
 	var toolObj = 
@@ -104,19 +115,33 @@ var pise_tool = (function() {
 				return;
 			}
 			$form.append("<div class='form_fields'>");
-			$form.append("<div class='simple'></div>");
-			$form.append("<div class='advanced'></div>");
-			$form.append('<input type="submit" value="View">');
-			$form.append("</div>");
-			$form.append("<dl class='comment'></dl>")
 
-			// selectors for the simple and advanced divs.  E.g. $(containers.simContainer) is the simple container.
+			$form.append("<p class='expandable_header'><i class='fa fa-lg fa-plus-square'></i>" + " Simple Parameters" + " </p>");
+            $form.append("<div class='simple expandable_content'></div>");
+
+			$form.append("<p class='expandable_header'><i class='fa fa-lg fa-plus-square'></i>" + " Advanced Parameters" + " </p>");
+			$form.append("<div class='advanced expandable_content'></div>");
+			$form.append('<input type="submit" class="big_button" value="View">');
+			$form.append("</div>");
+
+			$form.append("<p class='expandable_header'><i class='fa fa-lg fa-plus-square'></i>" + " Help" + " </p>");
+			$form.append("<dl class='comment expandable_content'></dl>");
+
+
+			// selectors for the simple and advanced divs where we'll be inserting elements.  E.g. $(containers.simContainer) is the simple container.
 			var containers =
 			{
 				simContainer: $(form_id + " > div.simple"),
 				advContainer: $(form_id  + " > div.advanced"),
 				comContainer: $(form_id + " > dl.comment")
 			};
+
+			// set this handler we've added all expandable sections.
+			$('.expandable_header').click(function()
+			{
+				$(this).next('.expandable_content').toggle('1000');
+				$("i",this).toggleClass("fa-plus-square fa-minus-square");
+			});
 			//append hidden fields that caller may want if he actually POSTS the form 
 			$form.append('<input type="hidden" name="toolidjson" id="toolidjson">');
 			$form.append('<input type="hidden" name="iparamsjson" id="iparamsjson">');
@@ -144,27 +169,13 @@ var pise_tool = (function() {
 							insertToForm(value, containers, false);
 						}
 					});
-
 				// Enable/disable elements based on their preconds.
 				resolveParameters(null);
 
-				//add collapse headings to simple and advanced containers
-				$form.children("div.simple")
-					.before("<h2 class='container-header'>Simple Parameters</h2>")
-					.prev()
-					.click(function() { $(this).next().slideToggle() });
-				$form.children("div.advanced")
-					.before("<h2 class='container-header'>Advanced Parameters</h2>")
-					.prev()
-					.click(function() { $(this).next().slideToggle() });
-				$form.children('dl.comment')
-					.before("<h2 class='container-header'>Help</h2>")
-					.prev()
-					.click(function() { $(this).next().slideToggle() });
 				// If no advanced parameters, hide the whole section
 				if (! $(containers.advContainer).find('input', 'select').length)
 				{
-					// hide the header and the div that would have controls. 
+					// hide the section title and the div with content
 					$(containers.advContainer).prev().hide();
 					$(containers.advContainer).hide();
 				}
@@ -364,6 +375,8 @@ var pise_tool = (function() {
 			.replace(/defined */g, ' ')
 			.replace(/\bne\b/g, '!=')
 			.replace(/\beq\b/g, '==')
+			.replace(/ or /g, ' || ')
+			.replace(/ and /g, ' && ')
 			.replace(/"/g, "'")
 			//replace regex testing operator
 			.replace(/ *=~ */g, '.search')
@@ -566,7 +579,9 @@ var pise_tool = (function() {
 			"<dt id='" + comId + "'><a href='#" + $eLabel.attr('id') + "'>" + options.label + "</a></dt>" +
 			"<dd>" + options.comment + "</dd>"
 		);
-		$eLabel.wrapInner('<a href="#' + comId + '"></a>');
+		// This puts an icon after the label and makes it a hyperlink to the help text.
+		var text = '<a href="#' +   comId +   '" ><i class="fa fa-info-circle "></i></a>';
+		$eLabel.append(text);
 	}
 
 	/*
@@ -818,6 +833,9 @@ var pise_tool = (function() {
 		}
 		return true;
 	}
+
+
+
 
 	return toolObj;
 
